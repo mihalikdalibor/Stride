@@ -10,19 +10,60 @@
       <span class="day-count" :class="{ done: allDone }">{{ doneCount }} / {{ tasks.length }}</span>
     </div>
 
-    <div v-for="task in tasks" :key="task.id" class="day-item">
+    <template v-for="item in items" :key="item.key">
+        <!-- connected-calendar event: fixed (no checkbox/edit), tap for details, swipe ← to remove -->
+        <div v-if="item.kind === 'event'" class="day-item">
+          <div class="swipe-wrap">
+            <div v-if="swipeId === item.key && swipeDx < 0" class="swipe-bg right" :class="{ ready: swipeDx < -SWIPE_TH }">
+              <i class="ti ti-trash"></i>
+            </div>
+            <div
+              class="trow"
+              :class="{ swiping: swipeId === item.key, today: isToday }"
+              :style="swipeStyle(item.key)"
+              @touchstart="onRowDown($event, item)"
+              @touchmove="onRowMove($event, item)"
+              @touchend="onRowUp($event, item)"
+            >
+              <span class="ev-mark" :style="{ color: evColor(item.ev) }"><i class="ti ti-calendar-event"></i></span>
+              <button type="button" class="row-text-btn ev-btn" :aria-expanded="openEventId === item.ev.id" @click="toggleEvent(item.ev)">
+                <span class="row-text">{{ item.ev.title }}</span>
+                <span class="row-sub">
+                  <span class="row-sub-time">{{ item.ev.all_day ? t('ics.allDay') : eventTimeLabel(item.ev) }}</span>
+                  <template v-if="item.ev.location">
+                    <span class="row-sub-sep">·</span>
+                    <span class="row-sub-note">{{ item.ev.location }}</span>
+                  </template>
+                </span>
+              </button>
+              <span
+                v-if="catColor(calendarsStore.categoryOf(item.ev))"
+                class="cat-dot"
+                :style="{ background: catColor(calendarsStore.categoryOf(item.ev))! }"
+              ></span>
+            </div>
+          </div>
+          <div v-if="openEventId === item.ev.id" class="ev-detail">
+            <span class="ev-source"><i class="ti ti-calendar-share"></i>{{ feedName(item.ev) }}</span>
+            <button class="act-btn danger" @click="removeEvent(item.ev)">
+              <i class="ti ti-trash"></i> {{ t('ics.removeEvent') }}
+            </button>
+          </div>
+        </div>
+
+        <div v-else class="day-item">
           <!-- edit mode -->
-          <div v-if="editingId === task.id" class="add-form edit-form">
+          <div v-if="editingId === item.task.id" class="add-form edit-form">
             <div class="add-input-row">
               <input
                 ref="editEl"
                 v-model="editTitle"
                 class="add-input"
                 :placeholder="t('day.itemName')"
-                @keyup.enter="saveEdit(task)"
+                @keyup.enter="saveEdit(item.task)"
                 @keyup.esc="cancelEdit"
               >
-              <button class="add-confirm" @click="saveEdit(task)"><i class="ti ti-check"></i></button>
+              <button class="add-confirm" @click="saveEdit(item.task)"><i class="ti ti-check"></i></button>
               <button class="add-cancel" @click="cancelEdit"><i class="ti ti-x"></i></button>
             </div>
             <textarea
@@ -47,7 +88,7 @@
               <template v-if="moveOpen">
                 <span class="eb-q">{{ t('day.moveTo') }}</span>
                 <input type="date" v-model="editDate" class="date-input">
-                <button class="add-confirm" @click="applyMove(task)" :aria-label="t('common.confirm')" :title="t('common.confirm')"><i class="ti ti-check"></i></button>
+                <button class="add-confirm" @click="applyMove(item.task)" :aria-label="t('common.confirm')" :title="t('common.confirm')"><i class="ti ti-check"></i></button>
                 <button class="add-cancel" @click="moveOpen = false" :aria-label="t('common.cancel')" :title="t('common.cancel')"><i class="ti ti-x"></i></button>
               </template>
               <template v-else>
@@ -79,7 +120,7 @@
                     </div>
                   </div>
                   <div class="action-row">
-                    <button class="act-btn danger" @click="removeTask(task)">
+                    <button class="act-btn danger" @click="removeTask(item.task)">
                       <i class="ti ti-trash"></i> {{ t('common.delete') }}
                     </button>
                     <button class="act-btn" @click="moveOpen = true">
@@ -93,9 +134,9 @@
 
           <!-- normal row (swipe: → done, ← delete) -->
           <div v-else class="swipe-wrap">
-            <template v-if="swipeId === task.id">
+            <template v-if="swipeId === item.key">
               <div v-if="swipeDx > 0" class="swipe-bg left" :class="{ ready: swipeDx > SWIPE_TH }">
-                <i class="ti" :class="task.status === 'done' ? 'ti-rotate-2' : 'ti-check'"></i>
+                <i class="ti" :class="item.task.status === 'done' ? 'ti-rotate-2' : 'ti-check'"></i>
               </div>
               <div v-else-if="swipeDx < 0" class="swipe-bg right" :class="{ ready: swipeDx < -SWIPE_TH }">
                 <i class="ti ti-trash"></i>
@@ -103,52 +144,61 @@
             </template>
             <div
               class="trow"
-              :class="{ swiping: swipeId === task.id, today: isToday }"
-              :style="swipeStyle(task.id)"
-              @touchstart="onRowDown($event, task)"
-              @touchmove="onRowMove($event, task)"
-              @touchend="onRowUp($event, task)"
+              :class="{ swiping: swipeId === item.key, today: isToday }"
+              :style="swipeStyle(item.key)"
+              @touchstart="onRowDown($event, item)"
+              @touchmove="onRowMove($event, item)"
+              @touchend="onRowUp($event, item)"
             >
               <button
                 type="button"
                 class="check"
-                :class="{ checked: task.status === 'done' }"
-                @click="tasksStore.toggleTask(task)"
-                :aria-label="task.status === 'done' ? t('day.markUndone') : t('day.markDone')"
-                :title="task.status === 'done' ? t('day.markUndone') : t('day.markDone')"
+                :class="{ checked: item.task.status === 'done' }"
+                @click="tasksStore.toggleTask(item.task)"
+                :aria-label="item.task.status === 'done' ? t('day.markUndone') : t('day.markDone')"
+                :title="item.task.status === 'done' ? t('day.markUndone') : t('day.markDone')"
               >
-                <i v-if="task.status === 'done'" class="ti ti-check"></i>
+                <i v-if="item.task.status === 'done'" class="ti ti-check"></i>
               </button>
-              <button type="button" class="row-text-btn" @click="openEdit(task)">
-                <span class="row-text" :class="{ done: task.status === 'done' }">{{ task.title }}</span>
-                <span v-if="task.task_time || task.note" class="row-sub">
-                  <span v-if="task.task_time" class="row-sub-time">{{ timeLabel(task) }}</span>
-                  <span v-if="task.task_time && task.note" class="row-sub-sep">·</span>
-                  <span v-if="task.note" class="row-sub-note">{{ task.note }}</span>
+              <button type="button" class="row-text-btn" @click="openEdit(item.task)">
+                <span class="row-text" :class="{ done: item.task.status === 'done' }">{{ item.task.title }}</span>
+                <span v-if="item.task.task_time || item.task.note" class="row-sub">
+                  <span v-if="item.task.task_time" class="row-sub-time">{{ timeLabel(item.task) }}</span>
+                  <span v-if="item.task.task_time && item.task.note" class="row-sub-sep">·</span>
+                  <span v-if="item.task.note" class="row-sub-note">{{ item.task.note }}</span>
                 </span>
               </button>
               <span
-                v-if="catColor(task.category_id)"
+                v-if="catColor(item.task.category_id)"
                 class="cat-dot"
-                :style="{ background: catColor(task.category_id)! }"
+                :style="{ background: catColor(item.task.category_id)! }"
               ></span>
-              <i v-if="task.repeat !== 'none'" class="ti ti-repeat row-repeat" :class="{ done: task.status === 'done' }"></i>
+              <i v-if="item.task.repeat !== 'none'" class="ti ti-repeat row-repeat" :class="{ done: item.task.status === 'done' }"></i>
               <button
                 type="button"
                 class="flag-dot"
-                :class="{ on: task.priority }"
-                @click.stop="toggleFlag(task)"
+                :class="{ on: item.task.priority }"
+                @click.stop="toggleFlag(item.task)"
                 :aria-label="t('day.priority')"
                 :title="t('day.priority')"
               ><i class="ti ti-flag"></i></button>
             </div>
           </div>
         </div>
+    </template>
 
     <div v-for="tomb in tombstones" :key="'tomb-' + tomb.id" class="trow tomb-row">
       <span class="tomb-icon"><i class="ti ti-trash"></i></span>
       <span class="tomb-text">{{ tomb.title }}</span>
       <button type="button" class="tomb-undo" @click="undoTomb(tomb)">
+        <i class="ti ti-arrow-back-up"></i> {{ t('undo.action') }}
+      </button>
+    </div>
+
+    <div v-for="tomb in evTombstones" :key="'evtomb-' + tomb.id" class="trow tomb-row">
+      <span class="tomb-icon"><i class="ti ti-trash"></i></span>
+      <span class="tomb-text">{{ tomb.title }}</span>
+      <button type="button" class="tomb-undo" @click="undoEventTomb(tomb)">
         <i class="ti ti-arrow-back-up"></i> {{ t('undo.action') }}
       </button>
     </div>
@@ -225,10 +275,12 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTasksStore } from '@/stores/tasks'
 import { useCategoriesStore } from '@/stores/categories'
+import { useCalendarsStore } from '@/stores/calendars'
 import CategoryPicker from '@/components/CategoryPicker.vue'
 import { useFmt } from '@/i18n/dates'
 import { today } from '@/lib/dates'
-import type { Task, TaskRepeat } from '@/types'
+import { eventStart, eventTimeLabel } from '@/lib/calendarEvents'
+import type { CalendarEvent, Task, TaskRepeat } from '@/types'
 
 const { t } = useI18n()
 const fmt = useFmt()
@@ -236,14 +288,35 @@ const fmt = useFmt()
 const props = withDefaults(defineProps<{
   date: string
   tasks: Task[]
+  events?: CalendarEvent[]   // connected-calendar events on this day (not counted in done/total)
   showHeader?: boolean
-}>(), { showHeader: true })
+}>(), { showHeader: true, events: () => [] })
 
 // notify parent (Home) so it can keep this day open while the undo row shows
 const emit = defineEmits<{ deleted: [string] }>()
 
 const tasksStore = useTasksStore()
 const categoriesStore = useCategoriesStore()
+const calendarsStore = useCalendarsStore()
+
+// Tasks + calendar events in one list: all-day events first, then timed tasks
+// and events by start time (event first on a tie), then untimed tasks in their
+// given order (props.tasks arrives already sorted by byDayOrder).
+type Item = { kind: 'task'; key: string; task: Task } | { kind: 'event'; key: string; ev: CalendarEvent }
+const items = computed<Item[]>(() => {
+  const rows = [
+    ...props.events.map(ev => ({
+      item: { kind: 'event', key: `ev-${ev.id}`, ev } as Item,
+      group: ev.all_day ? 0 : 1, time: eventStart(ev) ?? '', order: -1,
+    })),
+    ...props.tasks.map((task, i) => ({
+      item: { kind: 'task', key: task.id, task } as Item,
+      group: task.task_time ? 1 : 2, time: task.task_time?.slice(0, 5) ?? '', order: i,
+    })),
+  ]
+  rows.sort((a, b) => a.group - b.group || a.time.localeCompare(b.time) || a.order - b.order)
+  return rows.map(r => r.item)
+})
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
 const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'))
@@ -366,13 +439,13 @@ function swipeStyle(id: string) {
   return { transform: `translateX(${swipeDx.value}px)`, transition: 'none' }
 }
 
-function onRowDown(e: TouchEvent, task: Task) {
+function onRowDown(e: TouchEvent, item: Item) {
   sx = e.touches[0].clientX; sy = e.touches[0].clientY
   swiping = true; horizontal = false
-  swipeId.value = task.id; swipeDx.value = 0
+  swipeId.value = item.key; swipeDx.value = 0
 }
 
-function onRowMove(e: TouchEvent, _task: Task) {
+function onRowMove(e: TouchEvent, item: Item) {
   if (!swiping) return
   const dx = e.touches[0].clientX - sx
   const dy = e.touches[0].clientY - sy
@@ -383,16 +456,18 @@ function onRowMove(e: TouchEvent, _task: Task) {
   }
   e.preventDefault()        // lock to horizontal, stop the list scrolling
   e.stopPropagation()       // don't trigger week-swipe on the home root
-  swipeDx.value = dx
+  swipeDx.value = item.kind === 'event' ? Math.min(0, dx) : dx // events: ← remove only
 }
 
-function onRowUp(e: TouchEvent, task: Task) {
+function onRowUp(e: TouchEvent, item: Item) {
   if (horizontal) e.stopPropagation()
   const dx = swipeDx.value
   swiping = false; horizontal = false
   swipeId.value = null; swipeDx.value = 0
-  if (dx > SWIPE_TH) tasksStore.toggleTask(task)
-  else if (dx < -SWIPE_TH) deleteWithUndo(task)
+  if (item.kind === 'event') {
+    if (dx < -SWIPE_TH) removeEvent(item.ev)
+  } else if (dx > SWIPE_TH) tasksStore.toggleTask(item.task)
+  else if (dx < -SWIPE_TH) deleteWithUndo(item.task)
 }
 
 // Delete, leaving an inline "deleted · undo" tombstone row in its place for ~5s.
@@ -415,6 +490,37 @@ async function undoTomb(tomb: Task) {
   if (tmr) { clearTimeout(tmr); tombTimers.delete(tomb.id) }
   tombstones.value = tombstones.value.filter(x => x.id !== tomb.id)
   await tasksStore.restoreTask(tomb)
+}
+
+// Calendar events: tap shows the source + remove; removing hides the event
+// (kept hidden across syncs) with the same inline undo row as tasks.
+const openEventId = ref<string | null>(null)
+const evTombstones = ref<CalendarEvent[]>([])
+
+const evColor = (ev: CalendarEvent) => catColor(calendarsStore.categoryOf(ev)) ?? 'var(--color-text-tertiary)'
+const feedName = (ev: CalendarEvent) => calendarsStore.feeds.find(f => f.id === ev.feed_id)?.name ?? ''
+
+function toggleEvent(ev: CalendarEvent) {
+  openEventId.value = openEventId.value === ev.id ? null : ev.id
+}
+
+async function removeEvent(ev: CalendarEvent) {
+  openEventId.value = null
+  const snapshot = { ...ev }
+  await calendarsStore.hideEvent(ev)
+  emit('deleted', props.date)
+  evTombstones.value.push(snapshot)
+  tombTimers.set(`ev-${snapshot.id}`, setTimeout(() => {
+    evTombstones.value = evTombstones.value.filter(x => x.id !== snapshot.id)
+    tombTimers.delete(`ev-${snapshot.id}`)
+  }, 5000))
+}
+
+async function undoEventTomb(tomb: CalendarEvent) {
+  const tmr = tombTimers.get(`ev-${tomb.id}`)
+  if (tmr) { clearTimeout(tmr); tombTimers.delete(`ev-${tomb.id}`) }
+  evTombstones.value = evTombstones.value.filter(x => x.id !== tomb.id)
+  await calendarsStore.restoreEvent(tomb)
 }
 
 function cancelEdit() {
@@ -588,6 +694,16 @@ defineExpose({ openAdd })
 .trow-add { background: none; border: none; width: 100%; text-align: left; }
 
 .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* connected-calendar event row: calendar glyph in the category color instead of a checkbox */
+.ev-mark { width: 22px; height: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 19px; }
+.ev-btn { cursor: pointer; }
+.ev-detail {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 2px 0 8px 33px;
+}
+.ev-source { display: flex; align-items: center; gap: 5px; min-width: 0; font-size: 12px; color: var(--color-text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev-source i { font-size: 14px; }
 
 
 .edit-bottom { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 0 5px; }

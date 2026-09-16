@@ -81,7 +81,7 @@
             <div class="sheet-title">{{ sheetTitle }}</div>
             <button class="icon-btn" @click="sheetDate = null" :aria-label="t('cat.closeAria')" :title="t('cat.closeAria')"><i class="ti ti-x"></i></button>
           </div>
-          <DayList v-if="sheetDate" :date="sheetDate" :tasks="sheetTasks" :show-header="false" />
+          <DayList v-if="sheetDate" :date="sheetDate" :tasks="sheetTasks" :events="sheetEvents" :show-header="false" />
         </div>
       </div>
     </transition>
@@ -93,14 +93,17 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import DayList from '@/components/DayList.vue'
 import { useTasksStore } from '@/stores/tasks'
+import { useCalendarsStore } from '@/stores/calendars'
 import { useFmt } from '@/i18n/dates'
 import { parseYmd, today, ymd } from '@/lib/dates'
 import { STATUS_COLOR, dayStatus, type DayStatus } from '@/lib/status'
 import { byDayOrder } from '@/lib/sortTasks'
+import { eventOnDay } from '@/lib/calendarEvents'
 
 const { t } = useI18n()
 const fmt = useFmt()
 const tasksStore = useTasksStore()
+const calendarsStore = useCalendarsStore()
 
 const mode = ref<'month' | 'year'>('month')
 const todayStr = today()
@@ -344,11 +347,16 @@ const sheetTasks = computed(() =>
   sheetDate.value
     ? tasksStore.tasks.filter(t => t.task_date === sheetDate.value).sort(byDayOrder)
     : [])
+// connected-calendar events are loaded per opened day (they don't affect grid dots/counts)
+const sheetEvents = computed(() =>
+  sheetDate.value ? calendarsStore.events.filter(e => eventOnDay(e, sheetDate.value!)) : [])
+watch(sheetDate, d => { if (d) calendarsStore.fetchRange(d, d).catch(e => console.error(e)) })
 const sheetTitle = computed(() => (sheetDate.value ? fmt.fullDate(sheetDate.value) : ''))
 
 // ─── Init ─────────────────────────────────────────────────────────────────
 
 onMounted(async () => {
+  calendarsStore.init()
   await tasksStore.fetchRange(loadedFrom, loadedTo)
   nextTick(() => {
     scrollToMonth(`${todayY}-${todayM}`)

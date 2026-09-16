@@ -22,7 +22,27 @@
       <div class="wk-nav">
         <button class="icon-btn" @click="shiftWeek(-1)" :aria-label="t('home.prevWeekAria')" :title="t('home.prevWeekAria')"><i class="ti ti-chevron-left"></i></button>
         <button class="icon-btn" @click="shiftWeek(1)" :aria-label="t('home.nextWeekAria')" :title="t('home.nextWeekAria')"><i class="ti ti-chevron-right"></i></button>
-        <button class="icon-btn accent" @click="quickAdd" :aria-label="t('home.addItemAria')" :title="t('home.addItemAria')"><i class="ti ti-plus"></i></button>
+        <div class="add-wrap">
+          <button
+            class="icon-btn accent"
+            @click="addMenu = !addMenu"
+            :aria-label="t('home.addItemAria')"
+            :title="t('home.addItemAria')"
+            aria-haspopup="menu"
+            :aria-expanded="addMenu"
+          ><i class="ti ti-plus"></i></button>
+          <template v-if="addMenu">
+            <div class="menu-scrim" @click="addMenu = false"></div>
+            <div class="add-menu" role="menu">
+              <button role="menuitem" @click="addMenu = false; quickAdd()">
+                <i class="ti ti-circle-plus"></i>{{ t('home.addActivity') }}
+              </button>
+              <button role="menuitem" @click="addMenu = false; calSheet = true">
+                <i class="ti ti-calendar-plus"></i>{{ t('ics.connect') }}
+              </button>
+            </div>
+          </template>
+        </div>
       </div>
     </header>
 
@@ -72,7 +92,7 @@
     <OverdueSection v-if="isThisWeek" />
 
     <!-- empty state when a category filter matches nothing this week -->
-    <div v-if="selectedCats.size > 0 && totalCount === 0" class="empty-state">
+    <div v-if="selectedCats.size > 0 && totalCount === 0 && !eventCount" class="empty-state">
       <i class="ti ti-mood-empty"></i>
       <span>{{ t('empty.noTasksCategory') }}</span>
     </div>
@@ -86,6 +106,7 @@
             :ref="el => registerDay(day, el)"
             :date="day.date"
             :tasks="day.tasks"
+            :events="day.events"
             @deleted="keepDayOpen"
           />
           <button
@@ -111,6 +132,7 @@
     </section>
 
     <CategoriesSheet v-model="catSheet" />
+    <ConnectCalendarSheet v-model="calSheet" />
   </div>
 </template>
 
@@ -120,16 +142,20 @@ import { useI18n } from 'vue-i18n'
 import DayList from '@/components/DayList.vue'
 import OverdueSection from '@/components/OverdueSection.vue'
 import CategoriesSheet from '@/components/CategoriesSheet.vue'
+import ConnectCalendarSheet from '@/components/ConnectCalendarSheet.vue'
 import { useTasksStore } from '@/stores/tasks'
 import { useCategoriesStore } from '@/stores/categories'
+import { useCalendarsStore } from '@/stores/calendars'
 import { useFmt } from '@/i18n/dates'
 import { addDays, getMonday, today } from '@/lib/dates'
 import { byDayOrder } from '@/lib/sortTasks'
+import { eventOnDay } from '@/lib/calendarEvents'
 
 const { t } = useI18n()
 const fmt = useFmt()
 const tasksStore = useTasksStore()
 const categoriesStore = useCategoriesStore()
+const calendarsStore = useCalendarsStore()
 
 const monday = ref(getMonday(new Date()))
 const expanded = ref<Set<string>>(new Set())
@@ -141,6 +167,8 @@ function toggleCat(id: string) {
 }
 const isThisWeek = computed(() => monday.value === getMonday(today()))
 const catSheet = ref(false)
+const calSheet = ref(false)
+const addMenu = ref(false)
 const dayRefs = new Map<string, InstanceType<typeof DayList>>()
 
 const rangeLabel = computed(() => fmt.weekRange(monday.value))
@@ -156,6 +184,15 @@ const filteredTasks = computed(() =>
     ? tasksStore.tasks
     : tasksStore.tasks.filter(t => t.category_id !== null && selectedCats.value.has(t.category_id)))
 
+// connected-calendar events, same category filter (category comes from the feed)
+const filteredEvents = computed(() =>
+  selectedCats.value.size === 0
+    ? calendarsStore.events
+    : calendarsStore.events.filter(e => {
+      const c = calendarsStore.categoryOf(e)
+      return c !== null && selectedCats.value.has(c)
+    }))
+
 const weekDays = computed(() => {
   const t = today()
   return Array.from({ length: 7 }, (_, i) => {
@@ -163,11 +200,12 @@ const weekDays = computed(() => {
     const tasks = filteredTasks.value
       .filter(task => task.task_date === date)
       .sort(byDayOrder)
+    const events = filteredEvents.value.filter(e => eventOnDay(e, date))
     const isToday = date === t
     const isFuture = date > t
-    const full = tasks.length > 0 || isToday || expanded.value.has(date)
+    const full = tasks.length > 0 || events.length > 0 || isToday || expanded.value.has(date)
     return {
-      idx: i, date, tasks, isToday, isFuture,
+      idx: i, date, tasks, events, isToday, isFuture,
       label: fmt.dayMonthLabel(date),
       total: tasks.length,
       done: tasks.filter(task => task.status === 'done').length,
@@ -178,6 +216,7 @@ const weekDays = computed(() => {
 
 const totalCount = computed(() => weekDays.value.reduce((s, d) => s + d.total, 0))
 const doneCount = computed(() => weekDays.value.reduce((s, d) => s + d.done, 0))
+const eventCount = computed(() => weekDays.value.reduce((s, d) => s + d.events.length, 0))
 const progressPercent = computed(() => totalCount.value ? Math.round(doneCount.value / totalCount.value * 100) : 0)
 
 const maxTotal = computed(() => Math.max(1, ...weekDays.value.map(d => d.total)))
@@ -211,6 +250,7 @@ function quickAdd() {
 
 async function load() {
   expanded.value = new Set()
+  calendarsStore.fetchRange(monday.value, addDays(monday.value, 6)).catch(e => console.error(e))
   await tasksStore.fetchRange(monday.value, addDays(monday.value, 6))
   if (isThisWeek.value) tasksStore.fetchOverdue()
 }
@@ -236,12 +276,19 @@ const collapsed = ref(false)
 let scroller: HTMLElement | null = null
 function onScroll() { if (scroller) collapsed.value = scroller.scrollTop > 150 }
 
+function onKey(e: KeyboardEvent) { if (e.key === 'Escape') addMenu.value = false }
+
 onMounted(() => {
+  calendarsStore.init()
   load()
+  window.addEventListener('keydown', onKey)
   scroller = rootEl.value?.closest('.app-main') as HTMLElement | null
   scroller?.addEventListener('scroll', onScroll, { passive: true })
 })
-onBeforeUnmount(() => scroller?.removeEventListener('scroll', onScroll))
+onBeforeUnmount(() => {
+  scroller?.removeEventListener('scroll', onScroll)
+  window.removeEventListener('keydown', onKey)
+})
 </script>
 
 <style scoped>
@@ -279,6 +326,31 @@ onBeforeUnmount(() => scroller?.removeEventListener('scroll', onScroll))
 .title { font-size: 22px; font-weight: 500; line-height: 1.1; }
 .range { font-size: 13px; color: var(--color-text-secondary); margin-top: 3px; }
 .wk-nav { display: flex; gap: 6px; align-items: center; }
+
+/* "+" menu: add activity / connect calendar */
+.add-wrap { position: relative; }
+.menu-scrim { position: fixed; inset: 0; z-index: 25; }
+.add-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 26;
+  min-width: 210px; padding: 4px;
+  background: var(--color-background-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+  transform-origin: top right;
+  animation: menu-in .14s ease;
+}
+.add-menu button {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  border: none; background: none; cursor: pointer; text-align: left;
+  padding: 9px 10px; border-radius: 8px;
+  font-size: 15px; color: var(--color-text-primary);
+}
+.add-menu button + button { box-shadow: inset 0 0.5px 0 var(--color-border-tertiary); }
+.add-menu button:hover, .add-menu button:active { background: var(--color-background-secondary); }
+.add-menu i { font-size: 18px; color: var(--color-text-info); }
+@keyframes menu-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .add-menu { animation: none; } }
 
 .wk-progress { padding: 0 18px 12px; }
 .progress-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; }

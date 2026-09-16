@@ -1,4 +1,4 @@
-import type { Category, Note, NoteFolder, Task } from '@/types'
+import type { CalendarEvent, Category, Note, NoteFolder, Task } from '@/types'
 import { parseYmd, today, weekdayIndex } from '@/lib/dates'
 
 // Demo mode lets the app render realistic data during `npm run dev` without a
@@ -199,6 +199,23 @@ export function demoTasksForRange(from: string, to: string): Task[] {
   const end = parseYmd(to)
   for (let d = parseYmd(clampedFrom); d <= end; d.setDate(d.getDate() + 1)) {
     out.push(...tasksForDate(ymd(d), todayStr, currentMonday))
+  }
+  return out
+}
+
+// Events for a calendar connected in demo mode (no network): a Mon–Fri 08:00–16:00
+// shift titled after the feed, so "Connect calendar" can be tried out.
+export function demoEventsForRange(feedId: string, title: string, from: string, to: string): CalendarEvent[] {
+  const out: CalendarEvent[] = []
+  const end = parseYmd(to)
+  for (let d = parseYmd(from); d <= end; d.setDate(d.getDate() + 1)) {
+    const date = ymd(d)
+    if (weekdayIndex(date) > 4) continue
+    const at = (h: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), h).toISOString()
+    out.push({
+      id: `${feedId}-${date}`, feed_id: feedId, uid: date, title, location: null,
+      starts_at: at(8), ends_at: at(16), all_day: false, hidden: false,
+    })
   }
   return out
 }

@@ -148,6 +148,7 @@ database).
 - `src/i18n/` — `messages` (EN/SK/DE/ES/FR/IT/PT), `dates` (localized formats)
 - `src/styles/app.css` — design tokens + light/dark
 - `supabase/functions/delete-account/` — account-deletion Edge Function
+- `supabase/functions/calendar-sync/` — iCal feed fetch + parse (connected calendars)
 
 ---
 
@@ -215,10 +216,40 @@ create table notes (
 
 create index notes_user_updated_idx on notes (user_id, updated_at);
 
+create table calendar_feeds (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references auth.users (id) on delete cascade default auth.uid(),
+  name           text not null,
+  url            text not null,
+  category_id    uuid references categories (id) on delete set null,
+  last_synced_at timestamptz,
+  last_error     text,
+  created_at     timestamptz not null default now()
+);
+
+create table calendar_events (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users (id) on delete cascade default auth.uid(),
+  feed_id     uuid not null references calendar_feeds (id) on delete cascade,
+  uid         text not null,
+  title       text not null,
+  location    text,
+  starts_at   timestamptz not null,
+  ends_at     timestamptz not null,
+  all_day     boolean not null default false,
+  hidden      boolean not null default false,
+  synced_at   timestamptz not null default now(),
+  unique (feed_id, uid)
+);
+
+create index calendar_events_user_start_idx on calendar_events (user_id, starts_at);
+
 alter table tasks        enable row level security;
 alter table categories   enable row level security;
 alter table note_folders enable row level security;
 alter table notes        enable row level security;
+alter table calendar_feeds  enable row level security;
+alter table calendar_events enable row level security;
 
 create policy "tasks owner only" on tasks
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
@@ -230,6 +261,12 @@ create policy "note_folders owner only" on note_folders
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create policy "notes owner only" on notes
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "calendar_feeds owner only" on calendar_feeds
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "calendar_events owner only" on calendar_events
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 ```
 
@@ -278,6 +315,10 @@ update categories c set position = o.rn from ordered o where o.id = c.id;
 
 If your database was created before the Notes feature, run the `note_folders`/`notes` `create table` + RLS blocks above (they're additive — safe to run once on an existing project; skip if the tables already exist).
 
+### Migration — connected calendars (iCal)
+
+If your database was created before connected calendars, run the `calendar_feeds`/`calendar_events` `create table` + index + RLS blocks above (additive), then deploy the `calendar-sync` Edge Function (below).
+
 </details>
 
 <details>
@@ -296,6 +337,23 @@ supabase functions deploy delete-account
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are injected
 automatically. The client calls it via
 `supabase.functions.invoke('delete-account')`.
+
+</details>
+
+<details>
+<summary><b>Connected calendars (Edge Function)</b></summary>
+
+"Connect calendar" subscribes to an iCal/ICS URL (Humanity, Google Calendar
+"secret address in iCal format", Outlook "Publish calendar", school timetables…).
+Browsers can't fetch those feeds (no CORS), so `supabase/functions/calendar-sync`
+downloads + parses them server-side with the caller's JWT (RLS applies) and
+upserts the expanded occurrences (−60 / +365 days) into `calendar_events`.
+Removing an event sets `hidden = true`; sync never overwrites that flag.
+The app re-syncs a feed on open when it's older than 30 minutes.
+
+```bash
+supabase functions deploy calendar-sync
+```
 
 </details>
 

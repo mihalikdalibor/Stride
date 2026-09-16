@@ -42,3 +42,28 @@ export interface Task {
   created_at: string
   completed_at: string | null
 }
+
+// A subscribed iCal/ICS feed ("Connect calendar")
+export interface CalendarFeed {
+  id: string
+  name: string
+  url: string
+  category_id: string | null   // applies to all of the feed's events
+  last_synced_at: string | null
+  last_error: string | null     // error code from the last failed sync
+  created_at: string
+}
+
+// One occurrence from a feed (recurrences are expanded server-side). Read-only
+// except `hidden` — the user can remove an event without touching the source.
+export interface CalendarEvent {
+  id: string
+  feed_id: string
+  uid: string
+  title: string
+  location: string | null
+  starts_at: string   // ISO; all-day → date at 00:00Z
+  ends_at: string     // ISO; all-day → exclusive end date at 00:00Z
+  all_day: boolean
+  hidden: boolean
+}

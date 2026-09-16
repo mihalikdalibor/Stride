@@ -7,6 +7,23 @@ Nápady a vylepšenia na premyslenie. Legenda námahy: **S** = malé, **M** = st
 - [ ] **Pripomienky / push notifikácie** — „nezabudni na úlohu" (potrebuje riešenie pre push).
 - [ ] **Offline-first** — IndexedDB + sync (CLAUDE.md to vedome odkladá).
 
+## Pripojené kalendáre (iCal) — ďalšie kroky
+- [ ] 🔥 **Otestovať s reálnymi feedmi** (S) — Humanity rozvrh, školský rozvrh, Google „tajná adresa iCal", Outlook publikovaný kalendár; skontrolovať časy (časové zóny), opakovania a zrušené/presunuté udalosti. Chyby hľadať v Supabase → Edge Functions → calendar-sync → Logs.
+- [ ] 🔥 **Udalosti v štatistikách** (M) — zatiaľ sa nerátajú nikam. Rozhodnúť ako: napr. „odpracované hodiny" podľa kategórie (Categories sheet → Čas, Štatistiky → Hodiny), prípadne voliteľne započítať do done/total. Nemiešať s farbami dní (smena bez checkboxu nesmie spraviť deň „missed").
+- [ ] **Úprava pripojeného kalendára** (S) — premenovanie a zmena URL (teraz sa dá len zmeniť kategória, obnoviť alebo odpojiť).
+- [ ] **Udalosti v mesačnom/ročnom kalendári** (S) — malý farebný indikátor v mriežke (dnes sa zobrazia až v detaile dňa); stavová bodka ostáva len pre úlohy.
+- [ ] **Filter „Kalendáre" na Domove** (S) — chip na rýchle skrytie/zobrazenie všetkých udalostí.
+- [ ] **Obnoviť skryté udalosti** (S) — odstránená udalosť sa dá vrátiť len cez „Späť" (~5 s); pridať v nastaveniach kalendára „Zobraziť odstránené".
+- [ ] **Udalosť → úloha** (S) — akcia v detaile udalosti „Vytvoriť úlohu" (napr. príprava na skúšku), predvyplní názov/čas/kategóriu.
+- [ ] **Pravidelná synchronizácia na serveri** (M) — `pg_cron` volá `calendar-sync` pre všetky feedy (dnes sa synchronizuje len pri otvorení appky, ak je feed starší ako 30 min, alebo ručne).
+- [ ] **Staršia história** (S) — sync drží okno −60 / +365 dní; ak chceme v ročnom pohľade vidieť staršie udalosti, rozšíriť okno.
+
+## Dev / databáza
+- [ ] 🔥 **SQL migrácia na skopírovanie** (S) — v `README.md` pri „Migration — connected calendars" dať kompletný SQL blok (tabuľky + index + RLS), nie len odkaz na schému vyššie.
+- [ ] **Supabase migrácie** (M) — zaviesť `supabase/migrations/*.sql`, aby stačilo `npx supabase db push` namiesto ručného kopírovania SQL; existujúcu schému označiť ako aplikovanú.
+- [ ] **Návod pre nový Supabase projekt** (S) — do README: použiť **publishable/anon** kľúč (nie `sb_secret_…` → chyba „Forbidden use of secret API key in browser"), vypnúť *Confirm email* pre vývoj (Authentication → Sign In / Providers → Email) alebo vytvoriť používateľa cez Authentication → Users, nasadiť funkcie `calendar-sync` + `delete-account`.
+- [ ] **Commit / PR** (S) — kalendárovú funkciu dať do vetvy a PR pre kamaráta; `.supabase.pass` necommitovať (pridať do `.gitignore`).
+
 ## Todo
 - [ ] **Haptika** (S) — vibrácia pri akcii (Android cez Vibration API; iOS Safari nepodporuje).
 - [ ] **Jemné animácie** (S) — plynulý expand úlohy + prechod do Settings (fade/slide); 150–200 ms.
@@ -15,6 +32,7 @@ Nápady a vylepšenia na premyslenie. Legenda námahy: **S** = malé, **M** = st
 ---
 
 ## Hotovo
+- [x] **Pripojenie kalendára cez URL (iCal)** — `+` na Domove otvorí menu „Pridať aktivitu / Pripojiť kalendár“; sheet: URL (https/webcal) → overenie (počet udalostí) → názov + kategória → pripojiť; zoznam pripojených (obnoviť, zmena kategórie, odpojiť). Udalosti sú fixné, zobrazené medzi úlohami podľa času (Domov + detail dňa v Kalendári), dajú sa odstrániť (skryť, so Späť). `calendar-sync` Edge Function (ical.js, RRULE/výnimky/časové zóny), tabuľky `calendar_feeds` + `calendar_events`. *(Neskôr: započítanie udalostí do štatistík.)*
 - [x] **Landing page i18n** — všetky texty landingu (`LandingView.vue`) prešli cez `vue-i18n` (nový `landing` namespace vo všetkých 7 jazykoch v `messages.ts`); pridaný `LanguageSwitch` (compact/glóbus) do nav-u landingu, štylizovaný pod tmavú `.lp` paletu cez `:deep()`. Viacriadkový hero/why nadpis rieši `white-space: pre-line` namiesto natvrdo written `<br>`, aby si každý jazyk mohol zvoliť vlastné zalomenie.
 - [x] **Hover tooltips na ikonových tlačidlách** — natívny `:title` (mirror existujúceho `:aria-label`) na všetkých ikonových tlačidlách bez viditeľného textu naprieč appkou (`DayList.vue`, `NoteRow.vue`, `NoteEditorView.vue`, `NotesHomeView.vue`, `NotesListView.vue`, `AppHeader.vue`, `LanguageSwitch.vue`, `OverdueSection.vue`, `CategoriesSheet.vue`, `HomeView.vue`, `AuthView.vue`, `AccountView.vue`, `CalendarView.vue`, `LegalPage.vue`); po ceste opravený aj natvrdo napísaný neprekladaný aria-label (`CalendarView.vue` "Zavrieť" → `t('cat.closeAria')`).
 - [x] **Poznámky na landing page** — 4. karta „Notes" vo feature-showcase sekcii v `LandingView.vue`, + screenshot `public/screens/Notes.png` (rovnaký phone-portrait rámček ako ostatné, kurátorované demo dáta).
