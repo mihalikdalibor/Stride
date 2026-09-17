@@ -117,6 +117,7 @@
                         <option value="">--</option>
                         <option v-for="m in MINUTES" :key="m" :value="m">{{ m }}</option>
                       </select>
+                      <span v-if="endsNextDay(editHour, editMin, editEndHour, editEndMin)" class="next-day">+1</span>
                     </div>
                   </div>
                   <div class="action-row">
@@ -247,6 +248,7 @@
               <option value="">--</option>
               <option v-for="m in MINUTES" :key="m" :value="m">{{ m }}</option>
             </select>
+            <span v-if="endsNextDay(newHour, newMin, newEndHour, newEndMin)" class="next-day">+1</span>
           </div>
         </div>
         <div class="cat-repeat-row">
@@ -322,14 +324,18 @@ const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
 const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'))
 
 const toMin = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5))
-const minToHHMM = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+const DAY_MIN = 24 * 60
+// wraps past midnight: 27:00 → 03:00
+const minToHHMM = (m: number) => { m %= DAY_MIN; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}` }
 
-// task_time = start 'HH:MM', duration_min = (end - start) minutes → render "14:00–15:30"
+// task_time = start 'HH:MM', duration_min = (end - start) minutes → render "14:00–15:30";
+// an end past midnight gets a "+1" suffix: "22:00–03:00 +1"
 function timeLabel(task: Task): string {
   if (!task.task_time) return ''
   const start = task.task_time.slice(0, 5)
-  if (task.duration_min) return `${start}–${minToHHMM(toMin(start) + task.duration_min)}`
-  return start
+  if (!task.duration_min) return start
+  const endMin = toMin(start) + task.duration_min
+  return `${start}–${minToHHMM(endMin)}${endMin >= DAY_MIN ? ' +1' : ''}`
 }
 
 const adding = ref(false)
@@ -365,12 +371,17 @@ watch(editHour, h => { if (!h) { editEndHour.value = ''; editEndMin.value = '' }
 
 // 'HH'+'MM' selects → 'HH:MM' or null when no hour picked
 const composeTime = (hour: string, min: string) => (hour ? `${hour}:${min || '00'}` : null)
-// minutes between start and end (both 'HH'+'MM'); null unless end is after start
+// minutes between start and end (both 'HH'+'MM'); an end before the start means
+// it ends the next day (+24h); equal times → null
 function durFrom(start: string | null, endH: string, endM: string): number | null {
   if (!start || !endH) return null
   const diff = toMin(`${endH}:${endM || '00'}`) - toMin(start)
-  return diff > 0 ? diff : null
+  if (diff === 0) return null
+  return diff > 0 ? diff : diff + DAY_MIN
 }
+// form hint: the picked end is before the start → show "+1" next to "To"
+const endsNextDay = (hour: string, min: string, endH: string, endM: string) =>
+  !!hour && !!endH && toMin(`${endH}:${endM || '00'}`) < toMin(`${hour}:${min || '00'}`)
 const moveOpen = ref(false)
 const editEl = ref<HTMLInputElement[] | HTMLInputElement | null>(null)
 
@@ -726,6 +737,7 @@ defineExpose({ openAdd })
 }
 .field select:focus { outline: none; }
 .field .colon { color: var(--color-text-tertiary); }
+.field .next-day { flex-shrink: 0; font-size: 12px; font-weight: 500; color: var(--color-text-info); }
 .action-row { display: flex; gap: 10px; }
 .action-row > button { flex: 1; justify-content: center; }
 .eb-q { font-size: 14px; color: var(--color-text-secondary); }

@@ -79,7 +79,7 @@ home screen and still opens offline.
   scroll
 - ✅ **Tasks** — edit title/note/category, **drag & drop reorder** within a day,
   **move a task to another day**, start time + duration (rendered as
-  `14:00–15:30`), a priority flag, and **repeat** (daily/weekly/monthly) with a
+  `14:00–15:30`, or `22:00–03:00 +1` when it runs past midnight), a priority flag, and **repeat** (daily/weekly/monthly) with a
   spawn-on-complete model — completing a repeating task creates the next
   occurrence
 - 📆 **Calendar** — month and year views with infinite scroll, color-coded day

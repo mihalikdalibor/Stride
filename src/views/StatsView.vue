@@ -127,9 +127,12 @@ import {
 import { useI18n } from 'vue-i18n'
 import { useTasksStore } from '@/stores/tasks'
 import { useCategoriesStore } from '@/stores/categories'
+import { useCalendarsStore } from '@/stores/calendars'
 import { useFmt } from '@/i18n/dates'
 import { addDays, getMonday, parseYmd, today, weekdayIndex, ymd } from '@/lib/dates'
 import { weeklyGoal } from '@/lib/goal'
+import { countEvents } from '@/lib/statsPrefs'
+import { eventToItem, taskToItem, type StatItem } from '@/lib/statsItems'
 
 Chart.register(BarElement, CategoryScale, LinearScale, Tooltip)
 
@@ -137,6 +140,7 @@ const { t } = useI18n()
 const fmt = useFmt()
 const tasksStore = useTasksStore()
 const categoriesStore = useCategoriesStore()
+const calendarsStore = useCalendarsStore()
 const todayStr = today()
 
 const periods = ['week', 'month', 'year'] as const
@@ -168,28 +172,53 @@ const periodLabel = computed(() => {
   return String(d.getFullYear())
 })
 
-const periodTasks = computed(() => {
-  const { from, to } = periodRange.value
-  return tasksStore.tasks.filter(t => t.task_date >= from && t.task_date <= to)
+// tasks + (optionally) connected-calendar events: an event is done once it
+// has ended, planned before; it takes its feed's category
+const items = computed<StatItem[]>(() => {
+  const list = tasksStore.tasks.map(taskToItem)
+  if (!countEvents.value) return list
+  const now = Date.now()
+  for (const ev of calendarsStore.statsEvents) {
+    const item = eventToItem(ev, calendarsStore.categoryOf(ev), now)
+    if (item) list.push(item)
+  }
+  return list
 })
-const periodDone = computed(() => periodTasks.value.filter(t => t.status === 'done').length)
+const doneItems = computed(() => items.value.filter(i => i.done))
+
+const periodItems = computed(() => {
+  const { from, to } = periodRange.value
+  return items.value.filter(i => i.date >= from && i.date <= to)
+})
+const periodDone = computed(() => periodItems.value.filter(i => i.done).length)
+// completion is judged up to today (future items only feed planned hours)
 const completion = computed(() => {
-  const total = periodTasks.value.length
+  const total = periodItems.value.filter(i => i.date <= todayStr).length
   return total ? Math.round(periodDone.value / total * 100) : 0
 })
 
 // --- weekly goal (personal target; set in Settings, progress over current week) ---
 const weekDone = computed(() => {
   const mon = getMonday(todayStr), sun = addDays(mon, 6)
-  return tasksStore.tasks.filter(t => t.status === 'done' && t.task_date >= mon && t.task_date <= sun).length
+  return doneItems.value.filter(i => i.date >= mon && i.date <= sun).length
 })
 const goalPct = computed(() => Math.min(100, Math.round(weekDone.value / weeklyGoal.value * 100)))
 
 // --- streaks: walk days backward; done day counts, missed breaks, empty skips ---
+const dayTotals = computed(() => {
+  const m = new Map<string, { total: number; done: number }>()
+  for (const i of items.value) {
+    const d = m.get(i.date) ?? { total: 0, done: 0 }
+    d.total++
+    if (i.done) d.done++
+    m.set(i.date, d)
+  }
+  return m
+})
 function dayState(date: string): 'done' | 'missed' | 'none' {
-  const ts = tasksStore.tasks.filter(t => t.task_date === date)
-  if (ts.length === 0) return 'none'
-  return ts.every(t => t.status === 'done') ? 'done' : 'missed'
+  const d = dayTotals.value.get(date)
+  if (!d) return 'none'
+  return d.done === d.total ? 'done' : 'missed'
 }
 
 const currentStreak = computed(() => {
@@ -207,7 +236,7 @@ const currentStreak = computed(() => {
 })
 
 const longestStreak = computed(() => {
-  const dates = [...new Set(tasksStore.tasks.map(t => t.task_date))].sort()
+  const dates = [...dayTotals.value.keys()].sort()
   if (!dates.length) return 0
   let best = 0, run = 0
   let cursor = dates[0]
@@ -229,10 +258,10 @@ const chartTitle = computed(() => {
 })
 
 function doneBetween(from: string, to: string) {
-  return tasksStore.tasks.filter(t => t.status === 'done' && t.task_date >= from && t.task_date <= to).length
+  return doneItems.value.filter(i => i.date >= from && i.date <= to).length
 }
 function totalBetween(from: string, to: string) {
-  return tasksStore.tasks.filter(t => t.task_date >= from && t.task_date <= to).length
+  return items.value.filter(i => i.date >= from && i.date <= to && i.date <= todayStr).length
 }
 
 const buckets = computed(() => {
@@ -342,17 +371,15 @@ const chartOptions = computed<any>(() => {
   }
 })
 
-const doneTasks = computed(() => tasksStore.tasks.filter(t => t.status === 'done'))
-
 // insight adapts to the period: week → strongest weekday, month → strongest
 // week, year → strongest month
 const insight = computed(() => {
-  const tasks = doneTasks.value
+  const tasks = doneItems.value
   if (!tasks.length) return null
 
   if (period.value === 'week') {
     const counts = new Array(7).fill(0)
-    for (const t of tasks) counts[weekdayIndex(t.task_date)]++
+    for (const t of tasks) counts[weekdayIndex(t.date)]++
     const max = Math.max(...counts)
     if (!max) return null
     return t('stats.strongestDay', { day: fmt.dayName(addDays(getMonday(todayStr), counts.indexOf(max))) })
@@ -361,7 +388,7 @@ const insight = computed(() => {
   if (period.value === 'month') {
     const counts = new Map<string, number>()
     for (const task of tasks) {
-      const mon = getMonday(task.task_date)
+      const mon = getMonday(task.date)
       counts.set(mon, (counts.get(mon) ?? 0) + 1)
     }
     let best = '', bestN = 0
@@ -373,7 +400,7 @@ const insight = computed(() => {
 
   // year
   const counts = new Array(12).fill(0)
-  for (const task of tasks) counts[parseYmd(task.task_date).getMonth()]++
+  for (const task of tasks) counts[parseYmd(task.date).getMonth()]++
   const max = Math.max(...counts)
   if (!max) return null
   return t('stats.strongestMonth', { month: fmt.monthName(counts.indexOf(max)) })
@@ -384,7 +411,7 @@ const HEAT_WEEKS = 26
 const heatEl = ref<HTMLElement | null>(null)
 const heatWeeks = computed(() => {
   const counts = new Map<string, number>()
-  for (const t of doneTasks.value) counts.set(t.task_date, (counts.get(t.task_date) ?? 0) + 1)
+  for (const i of doneItems.value) counts.set(i.date, (counts.get(i.date) ?? 0) + 1)
   const startMon = addDays(getMonday(todayStr), -7 * (HEAT_WEEKS - 1))
   const weeks: { date: string; count: number; future: boolean; level: number }[][] = []
   for (let w = 0; w < HEAT_WEEKS; w++) {
@@ -425,17 +452,17 @@ function fmtH(min: number) {
 }
 
 // per category within the selected period (incl. "Bez kategórie"), sorted desc:
-// count mode = done task count; hours mode = done h / planned h (tasks with a duration set)
+// count mode = done count; hours mode = done h / planned h (items with a duration set)
 const NO_CAT = '__none__'
 const catBreakdown = computed(() => {
   if (catMode.value === 'hours') {
     const done = new Map<string, number>()
     const total = new Map<string, number>()
-    for (const t of periodTasks.value) {
-      if (t.duration_min == null) continue
-      const key = t.category_id ?? NO_CAT
-      total.set(key, (total.get(key) ?? 0) + t.duration_min)
-      if (t.status === 'done') done.set(key, (done.get(key) ?? 0) + t.duration_min)
+    for (const i of periodItems.value) {
+      if (i.minutes == null) continue
+      const key = i.category_id ?? NO_CAT
+      total.set(key, (total.get(key) ?? 0) + i.minutes)
+      if (i.done) done.set(key, (done.get(key) ?? 0) + i.minutes)
     }
     return [...total.entries()].map(([id, totalMin]) => {
       const doneMin = done.get(id) ?? 0
@@ -449,9 +476,9 @@ const catBreakdown = computed(() => {
   }
 
   const counts = new Map<string, number>()
-  for (const t of periodTasks.value) {
-    if (t.status !== 'done') continue
-    const key = t.category_id ?? NO_CAT
+  for (const i of periodItems.value) {
+    if (!i.done) continue
+    const key = i.category_id ?? NO_CAT
     counts.set(key, (counts.get(key) ?? 0) + 1)
   }
   const rows = [...counts.entries()].map(([id, val]) => ({ ...catMeta(id), val, label: String(val) }))
@@ -462,8 +489,19 @@ const catBreakdown = computed(() => {
 
 onMounted(async () => {
   const d = parseYmd(todayStr)
-  // fetch a year of history (covers all periods, 6-week chart, and streaks)
-  await tasksStore.fetchRange(ymd(new Date(d.getFullYear() - 1, d.getMonth(), 1)), todayStr)
+  // a year of history (periods, 6-week chart, streaks) up to the end of the
+  // current year / week, so planned future items count too
+  const from = ymd(new Date(d.getFullYear() - 1, d.getMonth(), 1))
+  const yearEnd = ymd(new Date(d.getFullYear(), 11, 31))
+  const weekEnd = addDays(getMonday(todayStr), 6)
+  const to = weekEnd > yearEnd ? weekEnd : yearEnd
+  calendarsStore.init()
+  await Promise.all([
+    tasksStore.fetchRange(from, to),
+    calendarsStore.loadFeeds()
+      .then(() => calendarsStore.fetchStatsRange(from, to))
+      .catch(e => console.error('stats events failed', e)), // tasks-only stats still work
+  ])
   // show the most recent weeks first
   await nextTick()
   if (heatEl.value) heatEl.value.scrollLeft = heatEl.value.scrollWidth

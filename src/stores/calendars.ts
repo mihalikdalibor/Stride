@@ -26,9 +26,12 @@ async function invoke<T>(body: Record<string, unknown>): Promise<T> {
 export const useCalendarsStore = defineStore('calendars', () => {
   const feeds = ref<CalendarFeed[]>([])
   const events = ref<CalendarEvent[]>([]) // visible (non-hidden) events for the loaded range
+  const statsEvents = ref<CalendarEvent[]>([]) // long range for Stats; separate so Home's week isn't replaced
   const syncing = ref<Set<string>>(new Set())
   let range: { from: string; to: string } | null = null
+  let statsRange: { from: string; to: string } | null = null
   let initialized = false
+  let feedsLoad: Promise<void> | null = null
   const demoHidden = new Set<string>()
 
   const feedById = computed(() => new Map(feeds.value.map(f => [f.id, f])))
@@ -36,6 +39,12 @@ export const useCalendarsStore = defineStore('calendars', () => {
   // events inherit the category chosen for their feed
   function categoryOf(ev: CalendarEvent): string | null {
     return feedById.value.get(ev.feed_id)?.category_id ?? null
+  }
+
+  // shared first load, so a view opened while init() is still running awaits the same feeds
+  function loadFeeds(): Promise<void> {
+    feedsLoad ??= fetchFeeds().catch(e => { feedsLoad = null; throw e })
+    return feedsLoad
   }
 
   async function fetchFeeds() {
@@ -64,6 +73,34 @@ export const useCalendarsStore = defineStore('calendars', () => {
       .order('starts_at', { ascending: true })
     if (error) throw error
     events.value = data ?? []
+  }
+
+  // Stats range (e.g. a year): paged, since PostgREST caps a response at 1000 rows
+  async function fetchStatsRange(from: string, to: string) {
+    statsRange = { from, to }
+    if (isDemo) {
+      statsEvents.value = feeds.value
+        .flatMap(f => demoEventsForRange(f.id, f.name, from, to))
+        .filter(e => !demoHidden.has(e.id))
+      return
+    }
+    if (!feeds.value.length) { statsEvents.value = []; return }
+    const PAGE = 1000
+    const out: CalendarEvent[] = []
+    for (let i = 0; ; i += PAGE) {
+      const { data, error } = await supabase
+        .from('calendar_events').select('*')
+        .eq('hidden', false)
+        .gte('starts_at', `${addDays(from, -1)}T00:00:00Z`)
+        .lt('starts_at', `${addDays(to, 2)}T00:00:00Z`)
+        .order('starts_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(i, i + PAGE - 1)
+      if (error) throw error
+      out.push(...(data ?? []))
+      if (!data || data.length < PAGE) break
+    }
+    statsEvents.value = out
   }
 
   const refetch = () => (range ? fetchRange(range.from, range.to) : Promise.resolve())
@@ -115,12 +152,13 @@ export const useCalendarsStore = defineStore('calendars', () => {
     if (initialized) return
     initialized = true
     try {
-      await fetchFeeds()
+      await loadFeeds()
       if (feeds.value.length) await refetch()
       const stale = feeds.value.filter(f => !f.last_synced_at || Date.now() - Date.parse(f.last_synced_at) > STALE_MS)
       if (!stale.length) return
       for (const f of stale) await sync(f, false)
       await refetch()
+      if (statsRange) await fetchStatsRange(statsRange.from, statsRange.to)
     } catch (e) {
       console.error('calendars init failed', e) // e.g. migration not run yet — tasks keep working
     }
@@ -143,6 +181,7 @@ export const useCalendarsStore = defineStore('calendars', () => {
     }
     feeds.value = feeds.value.filter(f => f.id !== id)
     events.value = events.value.filter(e => e.feed_id !== id)
+    statsEvents.value = statsEvents.value.filter(e => e.feed_id !== id)
   }
 
   // "remove" a single event: hidden stays set across future syncs
@@ -153,6 +192,7 @@ export const useCalendarsStore = defineStore('calendars', () => {
       if (error) throw error
     }
     events.value = events.value.filter(e => e.id !== ev.id)
+    statsEvents.value = statsEvents.value.filter(e => e.id !== ev.id)
   }
 
   async function restoreEvent(ev: CalendarEvent) {
@@ -162,10 +202,11 @@ export const useCalendarsStore = defineStore('calendars', () => {
       if (error) throw error
     }
     events.value.push({ ...ev, hidden: false })
+    if (!statsEvents.value.some(e => e.id === ev.id)) statsEvents.value.push({ ...ev, hidden: false })
   }
 
   return {
-    feeds, events, syncing, categoryOf,
-    init, fetchFeeds, fetchRange, preview, connect, sync, updateFeed, disconnect, hideEvent, restoreEvent,
+    feeds, events, statsEvents, syncing, categoryOf,
+    init, loadFeeds, fetchFeeds, fetchRange, fetchStatsRange, preview, connect, sync, updateFeed, disconnect, hideEvent, restoreEvent,
   }
 })

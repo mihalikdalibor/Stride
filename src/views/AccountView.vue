@@ -49,6 +49,18 @@
             <option v-for="n in goalRange" :key="n" :value="n">{{ n }}</option>
           </select>
         </div>
+        <div class="divider"></div>
+        <div class="ac-row">
+          <span class="row-label">{{ t('stats.countEvents') }}</span>
+          <button
+            class="ac-switch"
+            :class="{ on: countEvents }"
+            role="switch"
+            :aria-checked="countEvents"
+            :aria-label="t('stats.countEvents')"
+            @click="setCountEvents(!countEvents)"
+          ></button>
+        </div>
       </section>
 
       <div class="sec-label">{{ t('account.secAccount') }}</div>
@@ -315,6 +327,7 @@ import { applyTheme, getTheme, type Theme } from '@/lib/theme'
 import { isDemo } from '@/lib/demo'
 import { exportBackup, importBackup } from '@/lib/backup'
 import { weeklyGoal, setWeeklyGoal } from '@/lib/goal'
+import { countEvents, setCountEvents } from '@/lib/statsPrefs'
 
 const goalRange = Array.from({ length: 50 }, (_, i) => i + 1)
 
@@ -325,7 +338,7 @@ const categoriesStore = useCategoriesStore()
 
 const view = ref<'main' | 'password' | 'privacy' | 'terms'>('main')
 const CONTACT_EMAIL = 'stridebykeno@gmail.com'
-const APP_VERSION = '1.1.4'
+const APP_VERSION = '1.2.0'
 const email = computed(() => auth.session?.user.email ?? 'demo@stride.app')
 const initial = computed(() => email.value.charAt(0).toUpperCase())
 
@@ -505,6 +518,18 @@ function goBack() {
 .select-row { position: relative; }
 .select-row .row-value i { font-size: 18px; }
 .row-select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; }
+
+.ac-switch {
+  position: relative; flex-shrink: 0; width: 44px; height: 26px; padding: 0;
+  border: none; border-radius: 13px; cursor: pointer;
+  background: var(--color-background-tertiary); transition: background .2s ease;
+}
+.ac-switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .2s ease;
+}
+.ac-switch.on { background: var(--color-text-success); }
+.ac-switch.on::after { transform: translateX(18px); }
 
 .seg { display: flex; background: var(--color-background-tertiary); border-radius: 9px; padding: 2px; }
 .seg button {

@@ -71,6 +71,7 @@ const WEEK_PLAN: Plan[][] = [
   [
     { title: 'Long run', cat: 2, time: '09:00', dur: 75 },
     { title: 'Meal prep', cat: 3, time: '11:30', dur: 60 },
+    { title: 'Night out', cat: 3, time: '22:00', dur: 240 },
   ],
   // Sunday
   [

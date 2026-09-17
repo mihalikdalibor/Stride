@@ -11,3 +11,4 @@ supabase/.temp
 sw.js
 workbox-*.js
 precache-manifest.*.js
+claude-commands

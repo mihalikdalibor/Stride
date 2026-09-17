@@ -123,6 +123,7 @@ export const messages = {
       count: 'Count',
       hours: 'Hours',
       weeklyGoal: 'Weekly goal',
+      countEvents: 'Count calendar events',
       currentStreak: 'Current streak',
       longestStreak: 'Longest streak',
       days: '{n} days',
@@ -391,6 +392,7 @@ export const messages = {
       count: 'Počet',
       hours: 'Hodiny',
       weeklyGoal: 'Týždenný cieľ',
+      countEvents: 'Rátať udalosti z kalendára',
       currentStreak: 'Aktuálny streak',
       longestStreak: 'Najdlhší streak',
       days: '{n} dní',
@@ -616,7 +618,7 @@ export const messages = {
     },
     stats: {
       title: 'Statistik', week: 'Woche', month: 'Monat', year: 'Jahr', doneIn: 'Erledigt · {label}',
-      completion: 'Abschluss', count: 'Anzahl', hours: 'Stunden', weeklyGoal: 'Wochenziel', currentStreak: 'Aktuelle Serie', longestStreak: 'Längste Serie', days: '{n} Tage',
+      completion: 'Abschluss', count: 'Anzahl', hours: 'Stunden', weeklyGoal: 'Wochenziel', countEvents: 'Kalendertermine mitzählen', currentStreak: 'Aktuelle Serie', longestStreak: 'Längste Serie', days: '{n} Tage',
       byDay: 'Erledigt pro Tag', byWeek: 'Erledigt pro Woche', byMonth: 'Erledigt pro Monat',
       strongestDay: 'Stärkster Wochentag: {day}', strongestWeek: 'Stärkste Woche: {week}',
       strongestMonth: 'Stärkster Monat: {month}', byCategory: 'Nach Kategorie', activity: 'Aktivität',
@@ -792,7 +794,7 @@ export const messages = {
     },
     stats: {
       title: 'Estadísticas', week: 'Semana', month: 'Mes', year: 'Año', doneIn: 'Hecho · {label}',
-      completion: 'Completado', count: 'Cantidad', hours: 'Horas', weeklyGoal: 'Meta semanal', currentStreak: 'Racha actual', longestStreak: 'Mejor racha', days: '{n} días',
+      completion: 'Completado', count: 'Cantidad', hours: 'Horas', weeklyGoal: 'Meta semanal', countEvents: 'Contar eventos del calendario', currentStreak: 'Racha actual', longestStreak: 'Mejor racha', days: '{n} días',
       byDay: 'Hecho por día', byWeek: 'Hecho por semana', byMonth: 'Hecho por mes',
       strongestDay: 'Día más fuerte: {day}', strongestWeek: 'Semana más fuerte: {week}',
       strongestMonth: 'Mes más fuerte: {month}', byCategory: 'Por categoría', activity: 'Actividad',
@@ -968,7 +970,7 @@ export const messages = {
     },
     stats: {
       title: 'Stats', week: 'Semaine', month: 'Mois', year: 'Année', doneIn: 'Fait · {label}',
-      completion: 'Achèvement', count: 'Nombre', hours: 'Heures', weeklyGoal: 'Objectif hebdo', currentStreak: 'Série actuelle', longestStreak: 'Meilleure série', days: '{n} jours',
+      completion: 'Achèvement', count: 'Nombre', hours: 'Heures', weeklyGoal: 'Objectif hebdo', countEvents: 'Compter les événements du calendrier', currentStreak: 'Série actuelle', longestStreak: 'Meilleure série', days: '{n} jours',
       byDay: 'Fait par jour', byWeek: 'Fait par semaine', byMonth: 'Fait par mois',
       strongestDay: 'Jour le plus fort : {day}', strongestWeek: 'Semaine la plus forte : {week}',
       strongestMonth: 'Mois le plus fort : {month}', byCategory: 'Par catégorie', activity: 'Activité',
@@ -1144,7 +1146,7 @@ export const messages = {
     },
     stats: {
       title: 'Statistiche', week: 'Settimana', month: 'Mese', year: 'Anno', doneIn: 'Fatto · {label}',
-      completion: 'Completamento', count: 'Numero', hours: 'Ore', weeklyGoal: 'Obiettivo settimanale', currentStreak: 'Serie attuale', longestStreak: 'Serie più lunga', days: '{n} giorni',
+      completion: 'Completamento', count: 'Numero', hours: 'Ore', weeklyGoal: 'Obiettivo settimanale', countEvents: 'Conteggia eventi del calendario', currentStreak: 'Serie attuale', longestStreak: 'Serie più lunga', days: '{n} giorni',
       byDay: 'Fatto per giorno', byWeek: 'Fatto per settimana', byMonth: 'Fatto per mese',
       strongestDay: 'Giorno più forte: {day}', strongestWeek: 'Settimana più forte: {week}',
       strongestMonth: 'Mese più forte: {month}', byCategory: 'Per categoria', activity: 'Attività',
@@ -1320,7 +1322,7 @@ export const messages = {
     },
     stats: {
       title: 'Estatísticas', week: 'Semana', month: 'Mês', year: 'Ano', doneIn: 'Feito · {label}',
-      completion: 'Conclusão', count: 'Número', hours: 'Horas', weeklyGoal: 'Meta semanal', currentStreak: 'Sequência atual', longestStreak: 'Melhor sequência', days: '{n} dias',
+      completion: 'Conclusão', count: 'Número', hours: 'Horas', weeklyGoal: 'Meta semanal', countEvents: 'Contar eventos do calendário', currentStreak: 'Sequência atual', longestStreak: 'Melhor sequência', days: '{n} dias',
       byDay: 'Feito por dia', byWeek: 'Feito por semana', byMonth: 'Feito por mês',
       strongestDay: 'Dia mais forte: {day}', strongestWeek: 'Semana mais forte: {week}',
       strongestMonth: 'Mês mais forte: {month}', byCategory: 'Por categoria', activity: 'Atividade',
