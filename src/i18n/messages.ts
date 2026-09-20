@@ -1,6 +1,17 @@
 export const messages = {
   en: {
     common: { delete: 'Delete', cancel: 'Cancel', confirm: 'Confirm', confirmDelete: 'Delete?' },
+    item: {
+      activity: 'Activity', event: 'Event',
+      allDayHint: 'Without a time it becomes an all-day event.',
+      seriesNoSwitch: 'An occurrence of a repeating item can’t change its type.',
+      when: 'When', oneDay: 'This day', multiDay: 'Several days', repeat: 'Repeat',
+      daily: 'Daily', weekly: 'Weekly', until: 'Until',
+      selected: 'Selected: {n}', willCreate: 'Will create — items: {n}',
+      onlyThis: 'Only this', thisAndFollowing: 'This and following',
+      prevMonth: 'Previous month', nextMonth: 'Next month',
+      legacyRepeat: 'Repeats after completion', stopRepeat: 'Turn off',
+    },
     undo: { action: 'Undo' },
     overdue: { title: 'Overdue', toToday: 'Today' },
     empty: {
@@ -43,7 +54,6 @@ export const messages = {
       prevWeekAria: 'Previous week',
       nextWeekAria: 'Next week',
       addItemAria: 'Add item',
-      addActivity: 'Add activity',
       signOutAria: 'Sign out',
     },
     day: {
@@ -62,11 +72,6 @@ export const messages = {
       to: 'To',
       duration: 'Duration',
       priority: 'Flag as important',
-      repeat: 'Repeat',
-      repeatNone: 'No repeat',
-      repeatDaily: 'Daily',
-      repeatWeekly: 'Weekly',
-      repeatMonthly: 'Monthly',
     },
     cat: {
       none: 'None',
@@ -82,8 +87,12 @@ export const messages = {
       timeEmpty: 'No category has tracked time this week.',
       all: 'All',
       colorAria: 'Change color',
+      settingsAria: 'Category settings',
       customColorAria: 'Custom color',
       deleteAria: 'Delete',
+      countStreak: 'Count toward streak',
+      countStreakHint: 'Turn this off for fixed obligations — they say nothing about your discipline.',
+      notInStreak: 'Not counted toward the streak',
     },
     cal: { month: 'Month', year: 'Year', today: 'Today' },
     ics: {
@@ -123,7 +132,7 @@ export const messages = {
       count: 'Count',
       hours: 'Hours',
       weeklyGoal: 'Weekly goal',
-      countEvents: 'Count calendar events',
+      countEvents: 'Count events',
       currentStreak: 'Current streak',
       longestStreak: 'Longest streak',
       days: '{n} days',
@@ -182,7 +191,7 @@ export const messages = {
       exportData: 'Export data',
       importData: 'Import data',
       importNote: 'Import adds to your existing data — it does not replace it.',
-      importDone: 'Imported {n} tasks',
+      importDone: 'Imported {n} items',
       secAbout: 'About',
       privacy: 'Privacy Policy',
       terms: 'Terms of Service',
@@ -270,6 +279,17 @@ export const messages = {
   },
   sk: {
     common: { delete: 'Zmazať', cancel: 'Zrušiť', confirm: 'Potvrdiť', confirmDelete: 'Zmazať?' },
+    item: {
+      activity: 'Aktivita', event: 'Udalosť',
+      allDayHint: 'Bez času vznikne celodenná udalosť.',
+      seriesNoSwitch: 'Položke z opakovania sa typ zmeniť nedá.',
+      when: 'Kedy', oneDay: 'Tento deň', multiDay: 'Viac dní', repeat: 'Opakovať',
+      daily: 'Denne', weekly: 'Týždenne', until: 'Do',
+      selected: 'Vybrané: {n}', willCreate: 'Vytvorí sa položiek: {n}',
+      onlyThis: 'Len túto', thisAndFollowing: 'Túto a nasledujúce',
+      prevMonth: 'Predošlý mesiac', nextMonth: 'Ďalší mesiac',
+      legacyRepeat: 'Opakuje sa po dokončení', stopRepeat: 'Vypnúť',
+    },
     undo: { action: 'Späť' },
     overdue: { title: 'Po termíne', toToday: 'Dnes' },
     empty: {
@@ -312,7 +332,6 @@ export const messages = {
       prevWeekAria: 'Predošlý týždeň',
       nextWeekAria: 'Ďalší týždeň',
       addItemAria: 'Pridať položku',
-      addActivity: 'Pridať aktivitu',
       signOutAria: 'Odhlásiť sa',
     },
     day: {
@@ -331,11 +350,6 @@ export const messages = {
       to: 'Do',
       duration: 'Trvanie',
       priority: 'Označiť ako dôležité',
-      repeat: 'Opakovať',
-      repeatNone: 'Neopakovať',
-      repeatDaily: 'Denne',
-      repeatWeekly: 'Týždenne',
-      repeatMonthly: 'Mesačne',
     },
     cat: {
       none: 'Žiadna',
@@ -351,8 +365,12 @@ export const messages = {
       timeEmpty: 'Žiadna kategória nemá tento týždeň priradený čas.',
       all: 'Všetky',
       colorAria: 'Zmeniť farbu',
+      settingsAria: 'Nastavenia kategórie',
       customColorAria: 'Vlastná farba',
       deleteAria: 'Vymazať',
+      countStreak: 'Počítať do streaku',
+      countStreakHint: 'Vypni pri fixných povinnostiach — o tvojej disciplíne nič nevypovedajú.',
+      notInStreak: 'Nepočíta sa do streaku',
     },
     cal: { month: 'Mesiac', year: 'Rok', today: 'Dnes' },
     ics: {
@@ -392,7 +410,7 @@ export const messages = {
       count: 'Počet',
       hours: 'Hodiny',
       weeklyGoal: 'Týždenný cieľ',
-      countEvents: 'Rátať udalosti z kalendára',
+      countEvents: 'Rátať udalosti',
       currentStreak: 'Aktuálny streak',
       longestStreak: 'Najdlhší streak',
       days: '{n} dní',
@@ -451,7 +469,7 @@ export const messages = {
       exportData: 'Exportovať dáta',
       importData: 'Importovať dáta',
       importNote: 'Import pridáva k existujúcim dátam — nenahrádza ich.',
-      importDone: 'Importovaných {n} úloh',
+      importDone: 'Importovaných {n} položiek',
       secAbout: 'O aplikácii',
       privacy: 'Ochrana súkromia',
       terms: 'Podmienky používania',
@@ -539,6 +557,17 @@ export const messages = {
   },
   de: {
     common: { delete: 'Löschen', cancel: 'Abbrechen', confirm: 'Bestätigen', confirmDelete: 'Löschen?' },
+    item: {
+      activity: 'Aktivität', event: 'Termin',
+      allDayHint: 'Ohne Zeit wird es ein ganztägiger Termin.',
+      seriesNoSwitch: 'Bei einer Wiederholung lässt sich der Typ nicht ändern.',
+      when: 'Wann', oneDay: 'Dieser Tag', multiDay: 'Mehrere Tage', repeat: 'Wiederholen',
+      daily: 'Täglich', weekly: 'Wöchentlich', until: 'Bis',
+      selected: 'Ausgewählt: {n}', willCreate: 'Erstellt Einträge: {n}',
+      onlyThis: 'Nur diesen', thisAndFollowing: 'Diesen und folgende',
+      prevMonth: 'Voriger Monat', nextMonth: 'Nächster Monat',
+      legacyRepeat: 'Wiederholt sich nach dem Abschluss', stopRepeat: 'Ausschalten',
+    },
     undo: { action: 'Rückgängig' },
     overdue: { title: 'Überfällig', toToday: 'Heute' },
     empty: {
@@ -574,19 +603,21 @@ export const messages = {
     home: {
       brand: 'Stride', thisWeek: 'Diese Woche', lastWeek: 'Letzte Woche', nextWeek: 'Nächste Woche',
       doneThisWeek: 'Diese Woche erledigt', add: 'Hinzufügen', prevWeekAria: 'Vorige Woche',
-      nextWeekAria: 'Nächste Woche', addItemAria: 'Aufgabe hinzufügen', addActivity: 'Aktivität hinzufügen', signOutAria: 'Abmelden',
+      nextWeekAria: 'Nächste Woche', addItemAria: 'Aufgabe hinzufügen', signOutAria: 'Abmelden',
     },
     day: {
       today: 'heute', addItem: 'Aufgabe hinzufügen', itemName: 'Aufgabenname', deleteItem: 'Aufgabe löschen',
       markDone: 'Als erledigt markieren', markUndone: 'Als offen markieren', moveTo: 'Verschieben auf',
       reorder: 'Sortieren', note: 'Notiz (optional)', time: 'Uhrzeit (optional)', timeShort: 'Uhrzeit', from: 'Von', to: 'Bis', duration: 'Dauer', priority: 'Als wichtig markieren',
-      repeat: 'Wiederholen', repeatNone: 'Nicht wiederholen', repeatDaily: 'Täglich', repeatWeekly: 'Wöchentlich', repeatMonthly: 'Monatlich',
     },
     cat: {
       none: 'Keine', new: 'Neu', name: 'Kategoriename', title: 'Kategorien', newCategory: 'Neue Kategorie',
       add: 'Hinzufügen', closeAria: 'Schließen', empty: 'Noch keine Kategorien.', manage: 'Verwalten',
       time: 'Zeit', timeEmpty: 'Keine Kategorie hat diese Woche erfasste Zeit.',
-      all: 'Alle', colorAria: 'Farbe ändern', customColorAria: 'Eigene Farbe', deleteAria: 'Löschen',
+      all: 'Alle', colorAria: 'Farbe ändern', settingsAria: 'Kategorie-Einstellungen', customColorAria: 'Eigene Farbe', deleteAria: 'Löschen',
+      countStreak: 'Zur Serie zählen',
+      countStreakHint: 'Bei festen Verpflichtungen ausschalten — sie sagen nichts über deine Disziplin.',
+      notInStreak: 'Zählt nicht zur Serie',
     },
     cal: { month: 'Monat', year: 'Jahr', today: 'Heute' },
     ics: {
@@ -618,7 +649,7 @@ export const messages = {
     },
     stats: {
       title: 'Statistik', week: 'Woche', month: 'Monat', year: 'Jahr', doneIn: 'Erledigt · {label}',
-      completion: 'Abschluss', count: 'Anzahl', hours: 'Stunden', weeklyGoal: 'Wochenziel', countEvents: 'Kalendertermine mitzählen', currentStreak: 'Aktuelle Serie', longestStreak: 'Längste Serie', days: '{n} Tage',
+      completion: 'Abschluss', count: 'Anzahl', hours: 'Stunden', weeklyGoal: 'Wochenziel', countEvents: 'Termine mitzählen', currentStreak: 'Aktuelle Serie', longestStreak: 'Längste Serie', days: '{n} Tage',
       byDay: 'Erledigt pro Tag', byWeek: 'Erledigt pro Woche', byMonth: 'Erledigt pro Monat',
       strongestDay: 'Stärkster Wochentag: {day}', strongestWeek: 'Stärkste Woche: {week}',
       strongestMonth: 'Stärkster Monat: {month}', byCategory: 'Nach Kategorie', activity: 'Aktivität',
@@ -641,7 +672,7 @@ export const messages = {
     account: {
       title: 'Einstellungen', secGeneral: 'Allgemein', secAccount: 'Konto', secSecurity: 'Sicherheit',
       secData: 'Daten', exportData: 'Daten exportieren', importData: 'Daten importieren',
-      importNote: 'Der Import ergänzt deine vorhandenen Daten — er ersetzt sie nicht.', importDone: '{n} Aufgaben importiert',
+      importNote: 'Der Import ergänzt deine vorhandenen Daten — er ersetzt sie nicht.', importDone: '{n} Einträge importiert',
       secAbout: 'Über', privacy: 'Datenschutz', terms: 'Nutzungsbedingungen', feedback: 'Feedback senden', version: 'Version',
       lastUpdated: 'Zuletzt aktualisiert: Juni 2026',
       signedInAs: 'Angemeldet als', language: 'Sprache', theme: 'Darstellung',
@@ -715,6 +746,17 @@ export const messages = {
   },
   es: {
     common: { delete: 'Eliminar', cancel: 'Cancelar', confirm: 'Confirmar', confirmDelete: '¿Eliminar?' },
+    item: {
+      activity: 'Actividad', event: 'Evento',
+      allDayHint: 'Sin hora se convierte en un evento de todo el día.',
+      seriesNoSwitch: 'Una repetición no puede cambiar de tipo.',
+      when: 'Cuándo', oneDay: 'Este día', multiDay: 'Varios días', repeat: 'Repetir',
+      daily: 'Cada día', weekly: 'Cada semana', until: 'Hasta',
+      selected: 'Seleccionados: {n}', willCreate: 'Creará elementos: {n}',
+      onlyThis: 'Solo este', thisAndFollowing: 'Este y siguientes',
+      prevMonth: 'Mes anterior', nextMonth: 'Mes siguiente',
+      legacyRepeat: 'Se repite al completarse', stopRepeat: 'Desactivar',
+    },
     undo: { action: 'Deshacer' },
     overdue: { title: 'Atrasadas', toToday: 'Hoy' },
     empty: {
@@ -750,19 +792,21 @@ export const messages = {
     home: {
       brand: 'Stride', thisWeek: 'Esta semana', lastWeek: 'Semana pasada', nextWeek: 'Próxima semana',
       doneThisWeek: 'Hecho esta semana', add: 'Añadir', prevWeekAria: 'Semana anterior',
-      nextWeekAria: 'Próxima semana', addItemAria: 'Añadir tarea', addActivity: 'Añadir actividad', signOutAria: 'Cerrar sesión',
+      nextWeekAria: 'Próxima semana', addItemAria: 'Añadir tarea', signOutAria: 'Cerrar sesión',
     },
     day: {
       today: 'hoy', addItem: 'Añadir tarea', itemName: 'Nombre de la tarea', deleteItem: 'Eliminar tarea',
       markDone: 'Marcar como hecha', markUndone: 'Marcar como pendiente', moveTo: 'Mover a',
       reorder: 'Reordenar', note: 'Nota (opcional)', time: 'Hora (opcional)', timeShort: 'Hora', from: 'Desde', to: 'Hasta', duration: 'Duración', priority: 'Marcar como importante',
-      repeat: 'Repetir', repeatNone: 'No repetir', repeatDaily: 'Diario', repeatWeekly: 'Semanal', repeatMonthly: 'Mensual',
     },
     cat: {
       none: 'Ninguna', new: 'Nueva', name: 'Nombre de categoría', title: 'Categorías', newCategory: 'Nueva categoría',
       add: 'Añadir', closeAria: 'Cerrar', empty: 'Aún no hay categorías.', manage: 'Gestionar',
       time: 'Tiempo', timeEmpty: 'Ninguna categoría tiene tiempo registrado esta semana.',
-      all: 'Todas', colorAria: 'Cambiar color', customColorAria: 'Color personalizado', deleteAria: 'Eliminar',
+      all: 'Todas', colorAria: 'Cambiar color', settingsAria: 'Ajustes de categoría', customColorAria: 'Color personalizado', deleteAria: 'Eliminar',
+      countStreak: 'Contar en la racha',
+      countStreakHint: 'Desactívalo para obligaciones fijas: no dicen nada sobre tu disciplina.',
+      notInStreak: 'No cuenta en la racha',
     },
     cal: { month: 'Mes', year: 'Año', today: 'Hoy' },
     ics: {
@@ -794,7 +838,7 @@ export const messages = {
     },
     stats: {
       title: 'Estadísticas', week: 'Semana', month: 'Mes', year: 'Año', doneIn: 'Hecho · {label}',
-      completion: 'Completado', count: 'Cantidad', hours: 'Horas', weeklyGoal: 'Meta semanal', countEvents: 'Contar eventos del calendario', currentStreak: 'Racha actual', longestStreak: 'Mejor racha', days: '{n} días',
+      completion: 'Completado', count: 'Cantidad', hours: 'Horas', weeklyGoal: 'Meta semanal', countEvents: 'Contar eventos', currentStreak: 'Racha actual', longestStreak: 'Mejor racha', days: '{n} días',
       byDay: 'Hecho por día', byWeek: 'Hecho por semana', byMonth: 'Hecho por mes',
       strongestDay: 'Día más fuerte: {day}', strongestWeek: 'Semana más fuerte: {week}',
       strongestMonth: 'Mes más fuerte: {month}', byCategory: 'Por categoría', activity: 'Actividad',
@@ -817,7 +861,7 @@ export const messages = {
     account: {
       title: 'Ajustes', secGeneral: 'General', secAccount: 'Cuenta', secSecurity: 'Seguridad',
       secData: 'Datos', exportData: 'Exportar datos', importData: 'Importar datos',
-      importNote: 'La importación se añade a tus datos existentes — no los reemplaza.', importDone: '{n} tareas importadas',
+      importNote: 'La importación se añade a tus datos existentes — no los reemplaza.', importDone: '{n} elementos importados',
       secAbout: 'Acerca de', privacy: 'Privacidad', terms: 'Términos de servicio', feedback: 'Enviar comentarios', version: 'Versión',
       lastUpdated: 'Última actualización: junio de 2026',
       signedInAs: 'Conectado como', language: 'Idioma', theme: 'Apariencia',
@@ -891,6 +935,17 @@ export const messages = {
   },
   fr: {
     common: { delete: 'Supprimer', cancel: 'Annuler', confirm: 'Confirmer', confirmDelete: 'Supprimer ?' },
+    item: {
+      activity: 'Activité', event: 'Événement',
+      allDayHint: 'Sans heure, ce sera un événement sur toute la journée.',
+      seriesNoSwitch: 'Une occurrence d’une répétition ne peut pas changer de type.',
+      when: 'Quand', oneDay: 'Ce jour', multiDay: 'Plusieurs jours', repeat: 'Répéter',
+      daily: 'Chaque jour', weekly: 'Chaque semaine', until: 'Jusqu’au',
+      selected: 'Sélectionnés : {n}', willCreate: 'Éléments créés : {n}',
+      onlyThis: 'Seulement celui-ci', thisAndFollowing: 'Celui-ci et les suivants',
+      prevMonth: 'Mois précédent', nextMonth: 'Mois suivant',
+      legacyRepeat: 'Se répète après achèvement', stopRepeat: 'Désactiver',
+    },
     undo: { action: 'Annuler' },
     overdue: { title: 'En retard', toToday: "Aujourd'hui" },
     empty: {
@@ -926,19 +981,21 @@ export const messages = {
     home: {
       brand: 'Stride', thisWeek: 'Cette semaine', lastWeek: 'Semaine dernière', nextWeek: 'Semaine prochaine',
       doneThisWeek: 'Fait cette semaine', add: 'Ajouter', prevWeekAria: 'Semaine précédente',
-      nextWeekAria: 'Semaine suivante', addItemAria: 'Ajouter une tâche', addActivity: 'Ajouter une activité', signOutAria: 'Se déconnecter',
+      nextWeekAria: 'Semaine suivante', addItemAria: 'Ajouter une tâche', signOutAria: 'Se déconnecter',
     },
     day: {
       today: 'aujourd’hui', addItem: 'Ajouter une tâche', itemName: 'Nom de la tâche', deleteItem: 'Supprimer la tâche',
       markDone: 'Marquer comme faite', markUndone: 'Marquer comme à faire', moveTo: 'Déplacer au',
       reorder: 'Réordonner', note: 'Note (facultatif)', time: 'Heure (facultatif)', timeShort: 'Heure', from: 'De', to: 'À', duration: 'Durée', priority: 'Marquer comme important',
-      repeat: 'Répéter', repeatNone: 'Ne pas répéter', repeatDaily: 'Quotidien', repeatWeekly: 'Hebdomadaire', repeatMonthly: 'Mensuel',
     },
     cat: {
       none: 'Aucune', new: 'Nouvelle', name: 'Nom de catégorie', title: 'Catégories', newCategory: 'Nouvelle catégorie',
       add: 'Ajouter', closeAria: 'Fermer', empty: 'Aucune catégorie pour l’instant.', manage: 'Gérer',
       time: 'Temps', timeEmpty: 'Aucune catégorie n’a de temps enregistré cette semaine.',
-      all: 'Toutes', colorAria: 'Changer la couleur', customColorAria: 'Couleur personnalisée', deleteAria: 'Supprimer',
+      all: 'Toutes', colorAria: 'Changer la couleur', settingsAria: 'Réglages de catégorie', customColorAria: 'Couleur personnalisée', deleteAria: 'Supprimer',
+      countStreak: 'Compter dans la série',
+      countStreakHint: 'Désactive pour les obligations fixes — elles ne disent rien de ta discipline.',
+      notInStreak: 'Non comptée dans la série',
     },
     cal: { month: 'Mois', year: 'Année', today: 'Aujourd’hui' },
     ics: {
@@ -970,7 +1027,7 @@ export const messages = {
     },
     stats: {
       title: 'Stats', week: 'Semaine', month: 'Mois', year: 'Année', doneIn: 'Fait · {label}',
-      completion: 'Achèvement', count: 'Nombre', hours: 'Heures', weeklyGoal: 'Objectif hebdo', countEvents: 'Compter les événements du calendrier', currentStreak: 'Série actuelle', longestStreak: 'Meilleure série', days: '{n} jours',
+      completion: 'Achèvement', count: 'Nombre', hours: 'Heures', weeklyGoal: 'Objectif hebdo', countEvents: 'Compter les événements', currentStreak: 'Série actuelle', longestStreak: 'Meilleure série', days: '{n} jours',
       byDay: 'Fait par jour', byWeek: 'Fait par semaine', byMonth: 'Fait par mois',
       strongestDay: 'Jour le plus fort : {day}', strongestWeek: 'Semaine la plus forte : {week}',
       strongestMonth: 'Mois le plus fort : {month}', byCategory: 'Par catégorie', activity: 'Activité',
@@ -993,7 +1050,7 @@ export const messages = {
     account: {
       title: 'Réglages', secGeneral: 'Général', secAccount: 'Compte', secSecurity: 'Sécurité',
       secData: 'Données', exportData: 'Exporter les données', importData: 'Importer les données',
-      importNote: "L'import s'ajoute à vos données existantes — il ne les remplace pas.", importDone: '{n} tâches importées',
+      importNote: "L'import s'ajoute à vos données existantes — il ne les remplace pas.", importDone: '{n} éléments importés',
       secAbout: 'À propos', privacy: 'Confidentialité', terms: "Conditions d'utilisation", feedback: 'Envoyer un commentaire', version: 'Version',
       lastUpdated: 'Dernière mise à jour : juin 2026',
       signedInAs: 'Connecté en tant que', language: 'Langue', theme: 'Apparence',
@@ -1067,6 +1124,17 @@ export const messages = {
   },
   it: {
     common: { delete: 'Elimina', cancel: 'Annulla', confirm: 'Conferma', confirmDelete: 'Eliminare?' },
+    item: {
+      activity: 'Attività', event: 'Evento',
+      allDayHint: 'Senza orario diventa un evento di tutto il giorno.',
+      seriesNoSwitch: 'Un’occorrenza di una ripetizione non può cambiare tipo.',
+      when: 'Quando', oneDay: 'Questo giorno', multiDay: 'Più giorni', repeat: 'Ripeti',
+      daily: 'Ogni giorno', weekly: 'Ogni settimana', until: 'Fino al',
+      selected: 'Selezionati: {n}', willCreate: 'Creerà elementi: {n}',
+      onlyThis: 'Solo questo', thisAndFollowing: 'Questo e successivi',
+      prevMonth: 'Mese precedente', nextMonth: 'Mese successivo',
+      legacyRepeat: 'Si ripete al completamento', stopRepeat: 'Disattiva',
+    },
     undo: { action: 'Annulla' },
     overdue: { title: 'In ritardo', toToday: 'Oggi' },
     empty: {
@@ -1102,19 +1170,21 @@ export const messages = {
     home: {
       brand: 'Stride', thisWeek: 'Questa settimana', lastWeek: 'Settimana scorsa', nextWeek: 'Settimana prossima',
       doneThisWeek: 'Fatto questa settimana', add: 'Aggiungi', prevWeekAria: 'Settimana precedente',
-      nextWeekAria: 'Settimana successiva', addItemAria: 'Aggiungi attività', addActivity: 'Aggiungi attività', signOutAria: 'Esci',
+      nextWeekAria: 'Settimana successiva', addItemAria: 'Aggiungi attività', signOutAria: 'Esci',
     },
     day: {
       today: 'oggi', addItem: 'Aggiungi attività', itemName: 'Nome attività', deleteItem: 'Elimina attività',
       markDone: 'Segna come fatta', markUndone: 'Segna come da fare', moveTo: 'Sposta al',
       reorder: 'Riordina', note: 'Nota (facoltativa)', time: 'Ora (facoltativa)', timeShort: 'Ora', from: 'Dalle', to: 'Alle', duration: 'Durata', priority: 'Segna come importante',
-      repeat: 'Ripeti', repeatNone: 'Non ripetere', repeatDaily: 'Ogni giorno', repeatWeekly: 'Ogni settimana', repeatMonthly: 'Ogni mese',
     },
     cat: {
       none: 'Nessuna', new: 'Nuova', name: 'Nome categoria', title: 'Categorie', newCategory: 'Nuova categoria',
       add: 'Aggiungi', closeAria: 'Chiudi', empty: 'Ancora nessuna categoria.', manage: 'Gestisci',
       time: 'Tempo', timeEmpty: 'Nessuna categoria ha tempo registrato questa settimana.',
-      all: 'Tutte', colorAria: 'Cambia colore', customColorAria: 'Colore personalizzato', deleteAria: 'Elimina',
+      all: 'Tutte', colorAria: 'Cambia colore', settingsAria: 'Impostazioni categoria', customColorAria: 'Colore personalizzato', deleteAria: 'Elimina',
+      countStreak: 'Conta nella serie',
+      countStreakHint: 'Disattiva per gli impegni fissi: non dicono nulla sulla tua costanza.',
+      notInStreak: 'Non conta nella serie',
     },
     cal: { month: 'Mese', year: 'Anno', today: 'Oggi' },
     ics: {
@@ -1146,7 +1216,7 @@ export const messages = {
     },
     stats: {
       title: 'Statistiche', week: 'Settimana', month: 'Mese', year: 'Anno', doneIn: 'Fatto · {label}',
-      completion: 'Completamento', count: 'Numero', hours: 'Ore', weeklyGoal: 'Obiettivo settimanale', countEvents: 'Conteggia eventi del calendario', currentStreak: 'Serie attuale', longestStreak: 'Serie più lunga', days: '{n} giorni',
+      completion: 'Completamento', count: 'Numero', hours: 'Ore', weeklyGoal: 'Obiettivo settimanale', countEvents: 'Conteggia eventi', currentStreak: 'Serie attuale', longestStreak: 'Serie più lunga', days: '{n} giorni',
       byDay: 'Fatto per giorno', byWeek: 'Fatto per settimana', byMonth: 'Fatto per mese',
       strongestDay: 'Giorno più forte: {day}', strongestWeek: 'Settimana più forte: {week}',
       strongestMonth: 'Mese più forte: {month}', byCategory: 'Per categoria', activity: 'Attività',
@@ -1169,7 +1239,7 @@ export const messages = {
     account: {
       title: 'Impostazioni', secGeneral: 'Generale', secAccount: 'Account', secSecurity: 'Sicurezza',
       secData: 'Dati', exportData: 'Esporta dati', importData: 'Importa dati',
-      importNote: "L'importazione si aggiunge ai tuoi dati esistenti — non li sostituisce.", importDone: '{n} attività importate',
+      importNote: "L'importazione si aggiunge ai tuoi dati esistenti — non li sostituisce.", importDone: '{n} elementi importati',
       secAbout: 'Informazioni', privacy: 'Privacy', terms: 'Termini di servizio', feedback: 'Invia feedback', version: 'Versione',
       lastUpdated: 'Ultimo aggiornamento: giugno 2026',
       signedInAs: 'Accesso come', language: 'Lingua', theme: 'Aspetto',
@@ -1243,6 +1313,17 @@ export const messages = {
   },
   pt: {
     common: { delete: 'Eliminar', cancel: 'Cancelar', confirm: 'Confirmar', confirmDelete: 'Eliminar?' },
+    item: {
+      activity: 'Atividade', event: 'Evento',
+      allDayHint: 'Sem hora torna-se um evento de dia inteiro.',
+      seriesNoSwitch: 'Uma ocorrência de uma repetição não pode mudar de tipo.',
+      when: 'Quando', oneDay: 'Este dia', multiDay: 'Vários dias', repeat: 'Repetir',
+      daily: 'Diariamente', weekly: 'Semanalmente', until: 'Até',
+      selected: 'Selecionados: {n}', willCreate: 'Vai criar itens: {n}',
+      onlyThis: 'Apenas este', thisAndFollowing: 'Este e seguintes',
+      prevMonth: 'Mês anterior', nextMonth: 'Mês seguinte',
+      legacyRepeat: 'Repete após conclusão', stopRepeat: 'Desligar',
+    },
     undo: { action: 'Anular' },
     overdue: { title: 'Em atraso', toToday: 'Hoje' },
     empty: {
@@ -1278,19 +1359,21 @@ export const messages = {
     home: {
       brand: 'Stride', thisWeek: 'Esta semana', lastWeek: 'Semana passada', nextWeek: 'Próxima semana',
       doneThisWeek: 'Feito esta semana', add: 'Adicionar', prevWeekAria: 'Semana anterior',
-      nextWeekAria: 'Próxima semana', addItemAria: 'Adicionar tarefa', addActivity: 'Adicionar atividade', signOutAria: 'Terminar sessão',
+      nextWeekAria: 'Próxima semana', addItemAria: 'Adicionar tarefa', signOutAria: 'Terminar sessão',
     },
     day: {
       today: 'hoje', addItem: 'Adicionar tarefa', itemName: 'Nome da tarefa', deleteItem: 'Eliminar tarefa',
       markDone: 'Marcar como feita', markUndone: 'Marcar como pendente', moveTo: 'Mover para',
       reorder: 'Reordenar', note: 'Nota (opcional)', time: 'Hora (opcional)', timeShort: 'Hora', from: 'De', to: 'Até', duration: 'Duração', priority: 'Marcar como importante',
-      repeat: 'Repetir', repeatNone: 'Não repetir', repeatDaily: 'Diário', repeatWeekly: 'Semanal', repeatMonthly: 'Mensal',
     },
     cat: {
       none: 'Nenhuma', new: 'Nova', name: 'Nome da categoria', title: 'Categorias', newCategory: 'Nova categoria',
       add: 'Adicionar', closeAria: 'Fechar', empty: 'Ainda sem categorias.', manage: 'Gerir',
       time: 'Tempo', timeEmpty: 'Nenhuma categoria tem tempo registado esta semana.',
-      all: 'Todas', colorAria: 'Mudar cor', customColorAria: 'Cor personalizada', deleteAria: 'Eliminar',
+      all: 'Todas', colorAria: 'Mudar cor', settingsAria: 'Definições da categoria', customColorAria: 'Cor personalizada', deleteAria: 'Eliminar',
+      countStreak: 'Contar na sequência',
+      countStreakHint: 'Desliga para obrigações fixas — não dizem nada sobre a tua disciplina.',
+      notInStreak: 'Não conta na sequência',
     },
     cal: { month: 'Mês', year: 'Ano', today: 'Hoje' },
     ics: {
@@ -1322,7 +1405,7 @@ export const messages = {
     },
     stats: {
       title: 'Estatísticas', week: 'Semana', month: 'Mês', year: 'Ano', doneIn: 'Feito · {label}',
-      completion: 'Conclusão', count: 'Número', hours: 'Horas', weeklyGoal: 'Meta semanal', countEvents: 'Contar eventos do calendário', currentStreak: 'Sequência atual', longestStreak: 'Melhor sequência', days: '{n} dias',
+      completion: 'Conclusão', count: 'Número', hours: 'Horas', weeklyGoal: 'Meta semanal', countEvents: 'Contar eventos', currentStreak: 'Sequência atual', longestStreak: 'Melhor sequência', days: '{n} dias',
       byDay: 'Feito por dia', byWeek: 'Feito por semana', byMonth: 'Feito por mês',
       strongestDay: 'Dia mais forte: {day}', strongestWeek: 'Semana mais forte: {week}',
       strongestMonth: 'Mês mais forte: {month}', byCategory: 'Por categoria', activity: 'Atividade',
@@ -1345,7 +1428,7 @@ export const messages = {
     account: {
       title: 'Definições', secGeneral: 'Geral', secAccount: 'Conta', secSecurity: 'Segurança',
       secData: 'Dados', exportData: 'Exportar dados', importData: 'Importar dados',
-      importNote: 'A importação adiciona aos teus dados existentes — não os substitui.', importDone: '{n} tarefas importadas',
+      importNote: 'A importação adiciona aos teus dados existentes — não os substitui.', importDone: '{n} itens importados',
       secAbout: 'Sobre', privacy: 'Privacidade', terms: 'Termos de serviço', feedback: 'Enviar feedback', version: 'Versão',
       lastUpdated: 'Última atualização: junho de 2026',
       signedInAs: 'Sessão iniciada como', language: 'Idioma', theme: 'Aspeto',

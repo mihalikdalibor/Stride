@@ -51,36 +51,58 @@
                   class="swatch"
                   :style="{ background: c.color }"
                   @click="editing = editing === c.id ? null : c.id"
-                  :aria-label="t('cat.colorAria')"
-                  :title="t('cat.colorAria')"
+                  :aria-expanded="editing === c.id"
+                  :aria-label="t('cat.settingsAria')"
+                  :title="t('cat.settingsAria')"
                 ></button>
                 <input
                   class="cat-name"
                   :value="c.name"
                   @change="rename(c, ($event.target as HTMLInputElement).value)"
                 >
+                <i
+                  v-if="c.exclude_from_streak"
+                  class="ti ti-flame-off no-streak"
+                  :aria-label="t('cat.notInStreak')"
+                  :title="t('cat.notInStreak')"
+                ></i>
                 <button class="trash" @click="deleteCat(c)" :aria-label="t('cat.deleteAria')" :title="t('cat.deleteAria')">
                   <i class="ti ti-trash"></i>
                 </button>
               </div>
             </div>
-            <div v-if="editing === c.id" class="palette">
-              <button
-                v-for="col in PALETTE"
-                :key="col"
-                class="chip"
-                :class="{ on: col === c.color }"
-                :style="{ background: col }"
-                @click="store.updateCategory(c.id, { color: col }); editing = null"
-              ></button>
-              <label class="chip custom" :class="{ on: !PALETTE.includes(c.color) }" :aria-label="t('cat.customColorAria')" :title="t('cat.customColorAria')">
-                <input
-                  type="color"
-                  :value="c.color"
-                  @change="store.updateCategory(c.id, { color: ($event.target as HTMLInputElement).value })"
-                >
-                <i class="ti ti-color-picker"></i>
-              </label>
+            <div v-if="editing === c.id" class="cat-panel">
+              <div class="palette">
+                <button
+                  v-for="col in PALETTE"
+                  :key="col"
+                  class="chip"
+                  :class="{ on: col === c.color }"
+                  :style="{ background: col }"
+                  @click="store.updateCategory(c.id, { color: col })"
+                ></button>
+                <label class="chip custom" :class="{ on: !PALETTE.includes(c.color) }" :aria-label="t('cat.customColorAria')" :title="t('cat.customColorAria')">
+                  <input
+                    type="color"
+                    :value="c.color"
+                    @change="store.updateCategory(c.id, { color: ($event.target as HTMLInputElement).value })"
+                  >
+                  <i class="ti ti-color-picker"></i>
+                </label>
+              </div>
+              <div class="prop-row">
+                <i class="ti" :class="c.exclude_from_streak ? 'ti-flame-off' : 'ti-flame'"></i>
+                <span class="prop-label">{{ t('cat.countStreak') }}</span>
+                <button
+                  class="ac-switch"
+                  :class="{ on: !c.exclude_from_streak }"
+                  role="switch"
+                  :aria-checked="!c.exclude_from_streak"
+                  :aria-label="t('cat.countStreak')"
+                  @click="store.updateCategory(c.id, { exclude_from_streak: !c.exclude_from_streak })"
+                ></button>
+              </div>
+              <p class="prop-hint">{{ t('cat.countStreakHint') }}</p>
             </div>
               </div>
             </template>
@@ -133,7 +155,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import draggable from 'vuedraggable'
-import { useCategoriesStore } from '@/stores/categories'
+import { useCategoriesStore, type Affected } from '@/stores/categories'
 import { useTasksStore } from '@/stores/tasks'
 import { PALETTE } from '@/lib/colors'
 import type { Category } from '@/types'
@@ -171,14 +193,14 @@ function fmtHours(min: number) {
 function close() { emit('update:modelValue', false) }
 
 // delete (via trash tap or swipe-left) leaves an inline "undo" row for ~5s
-type Tomb = { cat: Category; taskIds: string[] }
+type Tomb = { cat: Category; affected: Affected }
 const tombstones = ref<Tomb[]>([])
 const tombTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 async function deleteCat(c: Category) {
   editing.value = null
-  const taskIds = await store.deleteCategory(c.id)
-  tombstones.value.push({ cat: { ...c }, taskIds })
+  const affected = await store.deleteCategory(c.id)
+  tombstones.value.push({ cat: { ...c }, affected })
   tombTimers.set(c.id, setTimeout(() => {
     tombstones.value = tombstones.value.filter(x => x.cat.id !== c.id)
     tombTimers.delete(c.id)
@@ -189,7 +211,7 @@ async function undoTomb(tomb: Tomb) {
   const tmr = tombTimers.get(tomb.cat.id)
   if (tmr) { clearTimeout(tmr); tombTimers.delete(tomb.cat.id) }
   tombstones.value = tombstones.value.filter(x => x.cat.id !== tomb.cat.id)
-  await store.restoreCategory(tomb.cat, tomb.taskIds)
+  await store.restoreCategory(tomb.cat, tomb.affected)
 }
 
 // swipe-left a category row to delete (touch)
@@ -317,6 +339,23 @@ async function add() {
 .empty { color: var(--color-text-tertiary); font-size: 14px; padding: 12px 0; }
 
 .palette { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0 4px; }
+.cat-panel { padding-bottom: 4px; }
+.no-streak { color: var(--color-text-tertiary); font-size: 15px; flex-shrink: 0; }
+.prop-row { display: flex; align-items: center; gap: 10px; padding: 10px 0 2px; }
+.prop-row > i { color: var(--color-text-tertiary); font-size: 18px; }
+.prop-label { flex: 1; font-size: 15px; }
+.prop-hint { color: var(--color-text-tertiary); font-size: 12px; margin: 0; }
+.ac-switch {
+  position: relative; flex-shrink: 0; width: 44px; height: 26px; padding: 0;
+  border: none; border-radius: 13px; cursor: pointer;
+  background: var(--color-background-tertiary); transition: background .2s ease;
+}
+.ac-switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .2s ease;
+}
+.ac-switch.on { background: var(--color-text-success); }
+.ac-switch.on::after { transform: translateX(18px); }
 .chip { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
 .chip.on { border-color: var(--color-text-primary); }
 .chip.custom {

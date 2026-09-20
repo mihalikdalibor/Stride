@@ -25,10 +25,10 @@ export function exitDemo() {
 }
 
 export const DEMO_CATEGORIES: Category[] = [
-  { id: 'demo-cat-1', name: 'Work', color: '#007aff', position: 0 },
-  { id: 'demo-cat-2', name: 'Study', color: '#af52de', position: 1 },
-  { id: 'demo-cat-3', name: 'Fitness', color: '#34c759', position: 2 },
-  { id: 'demo-cat-4', name: 'Personal', color: '#ff9500', position: 3 },
+  { id: 'demo-cat-1', name: 'Work', color: '#007aff', position: 0, exclude_from_streak: false },
+  { id: 'demo-cat-2', name: 'Study', color: '#af52de', position: 1, exclude_from_streak: false },
+  { id: 'demo-cat-3', name: 'Fitness', color: '#34c759', position: 2, exclude_from_streak: false },
+  { id: 'demo-cat-4', name: 'Personal', color: '#ff9500', position: 3, exclude_from_streak: false },
 ]
 const CAT = DEMO_CATEGORIES.map(c => c.id)
 
@@ -139,6 +139,7 @@ function makeTask(dateStr: string, i: number, p: Plan, status: Task['status']): 
     category_id: p.cat != null ? CAT[p.cat] : null,
     note: p.note ?? null,
     position: i,
+    series_id: null,
     created_at: dateStr + 'T08:00:00.000Z',
     completed_at: status === 'done' ? dateStr + 'T18:00:00.000Z' : null,
   }
@@ -214,8 +215,9 @@ export function demoEventsForRange(feedId: string, title: string, from: string, 
     if (weekdayIndex(date) > 4) continue
     const at = (h: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), h).toISOString()
     out.push({
-      id: `${feedId}-${date}`, feed_id: feedId, uid: date, title, location: null,
+      id: `${feedId}-${date}`, feed_id: feedId, uid: date, title, location: null, note: null,
       starts_at: at(8), ends_at: at(16), all_day: false, hidden: false,
+      category_id: null, series_id: null,
     })
   }
   return out

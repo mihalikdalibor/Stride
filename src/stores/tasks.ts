@@ -9,6 +9,9 @@ export const useTasksStore = defineStore('tasks', () => {
   const tasks = ref<Task[]>([])
   const overdue = ref<Task[]>([]) // incomplete tasks from before today (any week)
   const loading = ref(false)
+  let range: { from: string; to: string } | null = null // days currently in `tasks`
+
+  const inRange = (date: string) => !range || (date >= range.from && date <= range.to)
 
   // next free position within a day (append to the end), based on loaded tasks
   function nextPosition(task_date: string): number {
@@ -41,6 +44,7 @@ export const useTasksStore = defineStore('tasks', () => {
   // e.g. Monday–Sunday of a week ('2026-06-08', '2026-06-14')
   async function fetchRange(from: string, to: string) {
     loading.value = true
+    range = { from, to }
     try {
       if (isDemo) {
         tasks.value = demoTasksForRange(from, to)
@@ -58,16 +62,19 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
-  // all incomplete tasks dated before today (independent of the loaded week)
+  // All incomplete tasks dated before today (independent of the loaded week).
+  // Occurrences of a series are left out — a missed repeating activity stays on
+  // its own day instead of piling up here.
   async function fetchOverdue() {
     const t = today()
     if (isDemo) {
-      overdue.value = demoTasksForRange(addDays(t, -60), addDays(t, -1)).filter(x => x.status === 'todo')
+      overdue.value = demoTasksForRange(addDays(t, -60), addDays(t, -1))
+        .filter(x => x.status === 'todo' && !x.series_id)
       return
     }
     const { data, error } = await supabase
       .from('tasks').select('*')
-      .eq('status', 'todo').lt('task_date', t)
+      .eq('status', 'todo').lt('task_date', t).is('series_id', null)
       .order('task_date', { ascending: true })
     if (error) throw error
     overdue.value = data ?? []
@@ -78,7 +85,7 @@ export const useTasksStore = defineStore('tasks', () => {
     if (isDemo) {
       overdue.value.push({ ...task })
     } else {
-      const { id: _id, ...fields } = task
+      const { id: _id, user_id: _uid, ...fields } = task as Task & { user_id?: string }
       const { data, error } = await supabase.from('tasks').insert(fields).select().single()
       if (error) throw error
       overdue.value.push(data)
@@ -100,29 +107,49 @@ export const useTasksStore = defineStore('tasks', () => {
     if (!tasks.value.some(t => t.id === task.id)) tasks.value.push(task)
   }
 
-  async function addTask(
-    title: string,
-    task_date: string,
-    category_id: string | null = null,
-    task_time: string | null = null,
-    duration_min: number | null = null,
-    note: string | null = null,
-    repeat: TaskRepeat = 'none',
-  ) {
-    const position = nextPosition(task_date)
-    if (isDemo) {
-      tasks.value.push({
-        id: `demo-${crypto.randomUUID()}`,
-        title, task_date, task_time, duration_min, priority: false, repeat, status: 'todo',
-        category_id, note, position,
-        created_at: new Date().toISOString(), completed_at: null,
-      })
-      return
+  // Fields shared by every occurrence created in one go (see ItemDraft).
+  type NewTask = Pick<Task, 'title' | 'task_time' | 'duration_min' | 'category_id' | 'note'>
+
+  /** Create the task on each of `dates` (one day, several picked days, or an
+   *  expanded repeat rule). `series_id` groups the occurrences of a rule. */
+  async function addTasks(fields: NewTask, dates: string[], series_id: string | null = null): Promise<Task[]> {
+    if (!dates.length) return []
+    // `nextPosition` only sees the loaded range, so the days outside it are
+    // asked for their current last position (chunked to keep the URL short)
+    const outside = [...new Set(dates)].filter(d => !inRange(d))
+    const lastOutside = new Map<string, number>()
+    if (!isDemo && outside.length) {
+      for (let i = 0; i < outside.length; i += 50) {
+        const { data, error } = await supabase
+          .from('tasks').select('task_date, position').in('task_date', outside.slice(i, i + 50))
+        if (error) throw error
+        for (const row of data ?? []) {
+          lastOutside.set(row.task_date, Math.max(lastOutside.get(row.task_date) ?? -1, row.position ?? 0))
+        }
+      }
     }
-    const { data, error } = await supabase
-      .from('tasks').insert({ title, task_date, task_time, duration_min, category_id, note, repeat, position }).select().single()
+    const nextFor = (date: string) =>
+      inRange(date) ? nextPosition(date) : (lastOutside.get(date) ?? -1) + 1
+    const used = new Map<string, number>()
+    const rows = dates.map(task_date => {
+      const position = used.get(task_date) ?? nextFor(task_date)
+      used.set(task_date, position + 1)
+      return { ...fields, task_date, series_id, position }
+    })
+    if (isDemo) {
+      const made: Task[] = rows.map(r => ({
+        ...r, id: `demo-${crypto.randomUUID()}`,
+        priority: false, repeat: 'none' as TaskRepeat, status: 'todo' as TaskStatus,
+        created_at: new Date().toISOString(), completed_at: null,
+      }))
+      made.filter(r => inRange(r.task_date)).forEach(r => tasks.value.push(r))
+      return made
+    }
+    const { data, error } = await supabase.from('tasks').insert(rows).select()
     if (error) throw error
-    tasks.value.push(data)
+    // only occurrences inside the loaded range belong in the local list
+    for (const row of data ?? []) if (inRange(row.task_date)) tasks.value.push(row)
+    return data ?? []
   }
 
   // Insert the next occurrence of a recurring task on its next date (carries
@@ -133,7 +160,7 @@ export const useTasksStore = defineStore('tasks', () => {
     const fields = {
       title: task.title, task_date, task_time: task.task_time, duration_min: task.duration_min,
       category_id: task.category_id, note: task.note, priority: task.priority, repeat: task.repeat,
-      position: nextPosition(task_date),
+      position: nextPosition(task_date), series_id: null,
     }
     if (isDemo) {
       tasks.value.push({
@@ -182,7 +209,7 @@ export const useTasksStore = defineStore('tasks', () => {
       tasks.value.push({ ...task })
       return
     }
-    const { id: _id, ...fields } = task
+    const { id: _id, user_id: _uid, ...fields } = task as Task & { user_id?: string }
     const { data, error } = await supabase.from('tasks').insert(fields).select().single()
     if (error) throw error
     tasks.value.push(data)
@@ -202,6 +229,31 @@ export const useTasksStore = defineStore('tasks', () => {
     }
     const idx = tasks.value.findIndex(t => t.id === id)
     if (idx >= 0) Object.assign(tasks.value[idx], updates)
+  }
+
+  /** Apply `updates` to a series from `fromDate` on (the edit form's
+   *  "this and following" scope). */
+  async function updateSeries(series_id: string, fromDate: string, updates: Partial<Task>) {
+    if (!isDemo) {
+      const { error } = await supabase
+        .from('tasks').update(updates).eq('series_id', series_id).gte('task_date', fromDate)
+      if (error) throw error
+    }
+    for (const t of tasks.value) {
+      if (t.series_id === series_id && t.task_date >= fromDate) Object.assign(t, updates)
+    }
+  }
+
+  /** Delete a series from `fromDate` on. Returns how many loaded rows went. */
+  async function deleteSeries(series_id: string, fromDate: string) {
+    if (!isDemo) {
+      const { error } = await supabase
+        .from('tasks').delete().eq('series_id', series_id).gte('task_date', fromDate)
+      if (error) throw error
+    }
+    const gone = (t: Task) => t.series_id === series_id && t.task_date >= fromDate
+    tasks.value = tasks.value.filter(t => !gone(t))
+    overdue.value = overdue.value.filter(t => !gone(t))
   }
 
   // persist a new order for the given day's tasks (ids in their new order)
@@ -224,6 +276,6 @@ export const useTasksStore = defineStore('tasks', () => {
   return {
     tasks, overdue, loading,
     fetchRange, fetchOverdue, moveToToday, restoreOverdue, getAllTasks, importTasks,
-    addTask, toggleTask, deleteTask, restoreTask, updateTask, reorderTasks,
+    addTasks, toggleTask, deleteTask, restoreTask, updateTask, updateSeries, deleteSeries, reorderTasks,
   }
 })

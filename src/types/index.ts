@@ -6,6 +6,7 @@ export interface Category {
   name: string
   color: string
   position?: number
+  exclude_from_streak: boolean   // its tasks don't count toward the streak
   created_at?: string
 }
 
@@ -27,6 +28,22 @@ export interface Note {
   updated_at: string
 }
 
+export type ItemKind = 'task' | 'event'
+
+// What the add/edit item form hands back: an activity (task) or a fixed event.
+export interface ItemDraft {
+  kind: ItemKind
+  title: string
+  note: string | null
+  task_time: string | null      // 'HH:MM' start, null = no time (event → all-day)
+  duration_min: number | null   // end as minutes after the start
+  category_id: string | null
+  dates: string[]               // add: the day(s) to create; edit: the single (possibly moved) day
+  series: boolean               // dates came from a repeat rule → they share a series_id
+  scope: 'one' | 'following'    // edit: how far a change to a series item reaches
+  clearRepeat?: boolean         // edit: turn off a legacy `repeat` (spawn-on-complete)
+}
+
 export interface Task {
   id: string
   title: string
@@ -39,6 +56,7 @@ export interface Task {
   category_id: string | null
   note: string | null
   position: number             // order within a day
+  series_id: string | null     // set on every occurrence created from one repeat rule
   created_at: string
   completed_at: string | null
 }
@@ -54,16 +72,20 @@ export interface CalendarFeed {
   created_at: string
 }
 
-// One occurrence from a feed (recurrences are expanded server-side). Read-only
-// except `hidden` — the user can remove an event without touching the source.
+// One occurrence from a feed (recurrences are expanded server-side) or a
+// manually added event (`feed_id === null`, editable). Feed events are
+// read-only except `hidden` — removing one doesn't touch the source.
 export interface CalendarEvent {
   id: string
-  feed_id: string
+  feed_id: string | null   // null = manually added event (not from a feed)
   uid: string
   title: string
   location: string | null
+  note: string | null
   starts_at: string   // ISO; all-day → date at 00:00Z
   ends_at: string     // ISO; all-day → exclusive end date at 00:00Z
   all_day: boolean
   hidden: boolean
+  category_id: string | null   // manual events; feed events inherit the feed's category
+  series_id: string | null
 }

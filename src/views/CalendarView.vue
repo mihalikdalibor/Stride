@@ -36,7 +36,12 @@
               <button v-if="cell" class="calm-cell" @click="openDay(cell.date)">
                 <div class="calm-num" :class="{ t: cell.isToday }">{{ cell.day }}</div>
                 <div class="calm-meta">
-                  <span v-if="cell.status !== 'none'" class="calm-dot" :style="{ background: STATUS_COLOR[cell.status] }"></span>
+                  <span
+                    v-if="cell.status !== 'none'"
+                    class="calm-dot"
+                    :class="`is-${cell.status}`"
+                    :style="{ background: cell.bg }"
+                  ></span>
                   <span v-if="cell.count" class="calm-cnt">{{ cell.count }}</span>
                 </div>
               </button>
@@ -62,7 +67,12 @@
               <div v-for="(cell, i) in monthCells(y, mi)" :key="i" class="yr2-c">
                 <template v-if="cell">
                   <span class="yr2-n" :class="{ t: cell.isToday }">{{ cell.day }}</span>
-                  <span v-if="cell.status !== 'none'" class="yr2-d" :style="{ background: STATUS_COLOR[cell.status] }"></span>
+                  <span
+                    v-if="cell.status !== 'none'"
+                    class="yr2-d"
+                    :class="`is-${cell.status}`"
+                    :style="{ background: cell.bg }"
+                  ></span>
                 </template>
               </div>
             </div>
@@ -94,16 +104,20 @@ import { useI18n } from 'vue-i18n'
 import DayList from '@/components/DayList.vue'
 import { useTasksStore } from '@/stores/tasks'
 import { useCalendarsStore } from '@/stores/calendars'
+import { useCategoriesStore } from '@/stores/categories'
 import { useFmt } from '@/i18n/dates'
 import { parseYmd, today, ymd } from '@/lib/dates'
-import { STATUS_COLOR, dayStatus, type DayStatus } from '@/lib/status'
+import { dayStatus, type DayStatus } from '@/lib/status'
+import { dotBackground } from '@/lib/dayColors'
 import { byDayOrder } from '@/lib/sortTasks'
-import { eventOnDay } from '@/lib/calendarEvents'
+import { eventDays, eventOnDay } from '@/lib/calendarEvents'
+import type { CalendarEvent, Task } from '@/types'
 
 const { t } = useI18n()
 const fmt = useFmt()
 const tasksStore = useTasksStore()
 const calendarsStore = useCalendarsStore()
+const categoriesStore = useCategoriesStore()
 
 const mode = ref<'month' | 'year'>('month')
 const todayStr = today()
@@ -118,7 +132,30 @@ const sheetDate = ref<string | null>(null)
 
 // ─── Cell builder ─────────────────────────────────────────────────────────
 
-interface Cell { day: number; date: string; isToday: boolean; status: DayStatus; count: number }
+interface Cell { day: number; date: string; isToday: boolean; status: DayStatus; count: number; bg: string }
+
+interface DayBucket { tasks: Task[]; events: CalendarEvent[] }
+
+// Everything on screen is keyed by day, so the whole loaded span is bucketed
+// once instead of scanning the task list per cell (both grids call monthCells
+// on every render).
+const dayIndex = computed(() => {
+  const m = new Map<string, DayBucket>()
+  const bucket = (date: string) => {
+    let b = m.get(date)
+    if (!b) m.set(date, (b = { tasks: [], events: [] }))
+    return b
+  }
+  for (const task of tasksStore.tasks) bucket(task.task_date).tasks.push(task)
+  for (const ev of calendarsStore.gridEvents) for (const d of eventDays(ev)) bucket(d).events.push(ev)
+  return m
+})
+
+// the user's category order, so the same mix always draws the same dot
+const catOrder = computed(() => categoriesStore.categories.map(c => c.color))
+
+// shared read-only fallback for days with nothing on them
+const EMPTY: DayBucket = Object.freeze({ tasks: Object.freeze([]) as unknown as Task[], events: Object.freeze([]) as unknown as CalendarEvent[] })
 
 function monthCells(year: number, month: number): (Cell | null)[] {
   const offset = (new Date(year, month, 1).getDay() + 6) % 7
@@ -127,8 +164,19 @@ function monthCells(year: number, month: number): (Cell | null)[] {
   for (let i = 0; i < offset; i++) cells.push(null)
   for (let d = 1; d <= len; d++) {
     const date = ymd(new Date(year, month, d))
-    const dayTasks = tasksStore.tasks.filter(t => t.task_date === date)
-    cells.push({ day: d, date, isToday: date === todayStr, status: dayStatus(dayTasks, date, todayStr), count: dayTasks.length })
+    const { tasks: dayTasks, events: dayEvents } = dayIndex.value.get(date) ?? EMPTY
+    const colors = [
+      ...dayTasks.map(t => categoriesStore.color(t.category_id)),
+      ...dayEvents.map(ev => categoriesStore.color(calendarsStore.categoryOf(ev))),
+    ]
+    cells.push({
+      day: d,
+      date,
+      isToday: date === todayStr,
+      status: dayStatus(dayTasks, dayEvents, date, todayStr),
+      count: dayTasks.length,
+      bg: dotBackground(colors, catOrder.value),
+    })
   }
   return cells
 }
@@ -161,7 +209,10 @@ async function extendFetch(from: string, to: string) {
   if (newFrom !== loadedFrom || newTo !== loadedTo) {
     loadedFrom = newFrom
     loadedTo   = newTo
-    await tasksStore.fetchRange(loadedFrom, loadedTo)
+    await Promise.all([
+      tasksStore.fetchRange(loadedFrom, loadedTo),
+      calendarsStore.fetchGridRange(loadedFrom, loadedTo).catch(e => console.error(e)),
+    ])
   }
 }
 
@@ -205,7 +256,11 @@ function onMonthScroll() {
     if (!el) continue
     const rect = el.getBoundingClientRect()
     if (rect.bottom > scrollerRect.top + 1) {
-      anchor.value = { year: item.year, month: item.month }
+      // only on a real change: a fresh object every scroll tick would
+      // re-render (and re-build every dot) on each frame
+      if (anchor.value.year !== item.year || anchor.value.month !== item.month) {
+        anchor.value = { year: item.year, month: item.month }
+      }
       break
     }
   }
@@ -317,6 +372,11 @@ function openMonth(year: number, month: number) {
 
 function setMode(m: 'month' | 'year') {
   mode.value = m
+  // the year grid shows whole years at once, but the loaded span starts at
+  // ±6 months — without this the year you land on is half dot-less
+  if (m === 'year') {
+    extendFetch(ymd(new Date(yearAnchor.value, 0, 1)), ymd(new Date(yearAnchor.value, 11, 31)))
+  }
   nextTick(() => {
     setupObservers()
     if (m === 'year') scrollToCurrentInYear()
@@ -347,7 +407,8 @@ const sheetTasks = computed(() =>
   sheetDate.value
     ? tasksStore.tasks.filter(t => t.task_date === sheetDate.value).sort(byDayOrder)
     : [])
-// connected-calendar events are loaded per opened day (they don't affect grid dots/counts)
+// the sheet keeps its own per-day load (`events`); the grid's dots read the
+// separate cumulative `gridEvents` bucket, so the two don't fight
 const sheetEvents = computed(() =>
   sheetDate.value ? calendarsStore.events.filter(e => eventOnDay(e, sheetDate.value!)) : [])
 watch(sheetDate, d => { if (d) calendarsStore.fetchRange(d, d).catch(e => console.error(e)) })
@@ -357,7 +418,10 @@ const sheetTitle = computed(() => (sheetDate.value ? fmt.fullDate(sheetDate.valu
 
 onMounted(async () => {
   calendarsStore.init()
-  await tasksStore.fetchRange(loadedFrom, loadedTo)
+  await Promise.all([
+    tasksStore.fetchRange(loadedFrom, loadedTo),
+    calendarsStore.fetchGridRange(loadedFrom, loadedTo).catch(e => console.error(e)),
+  ])
   nextTick(() => {
     scrollToMonth(`${todayY}-${todayM}`)
     setupObservers()

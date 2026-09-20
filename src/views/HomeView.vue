@@ -35,7 +35,7 @@
             <div class="menu-scrim" @click="addMenu = false"></div>
             <div class="add-menu" role="menu">
               <button role="menuitem" @click="addMenu = false; quickAdd()">
-                <i class="ti ti-circle-plus"></i>{{ t('home.addActivity') }}
+                <i class="ti ti-circle-plus"></i>{{ t('home.add') }}
               </button>
               <button role="menuitem" @click="addMenu = false; calSheet = true">
                 <i class="ti ti-calendar-plus"></i>{{ t('ics.connect') }}
@@ -63,8 +63,13 @@
         <div class="bar-area">
           <div v-if="day.total === 0" class="bar-empty"></div>
           <div v-else class="bar" :style="{ height: barHeight(day.total) + 'px' }">
-            <div class="bar-rem" :style="{ height: barRemPx(day) + 'px' }"></div>
-            <div class="bar-done" :style="{ height: barDonePx(day) + 'px' }"></div>
+            <div
+              v-for="seg in barSegments(day.tasks)"
+              :key="seg.key"
+              class="bar-seg"
+              :class="{ todo: !seg.done }"
+              :style="{ background: seg.color }"
+            ></div>
           </div>
         </div>
         <span class="chart-label" :class="{ red: day.isToday }">{{ fmt.dayLetters()[day.idx] }}</span>
@@ -150,6 +155,8 @@ import { useFmt } from '@/i18n/dates'
 import { addDays, getMonday, today } from '@/lib/dates'
 import { byDayOrder } from '@/lib/sortTasks'
 import { eventOnDay } from '@/lib/calendarEvents'
+import { NO_CAT_COLOR } from '@/lib/dayColors'
+import type { Task } from '@/types'
 
 const { t } = useI18n()
 const fmt = useFmt()
@@ -184,7 +191,7 @@ const filteredTasks = computed(() =>
     ? tasksStore.tasks
     : tasksStore.tasks.filter(t => t.category_id !== null && selectedCats.value.has(t.category_id)))
 
-// connected-calendar events, same category filter (category comes from the feed)
+// events, same category filter (manual events carry their own category, feed events the feed's)
 const filteredEvents = computed(() =>
   selectedCats.value.size === 0
     ? calendarsStore.events
@@ -222,11 +229,20 @@ const progressPercent = computed(() => totalCount.value ? Math.round(doneCount.v
 const maxTotal = computed(() => Math.max(1, ...weekDays.value.map(d => d.total)))
 const BAR_MAX = 56
 function barHeight(total: number) { return Math.max(8, Math.round(total / maxTotal.value * BAR_MAX)) }
-function barDonePx(day: { total: number; done: number }) {
-  return Math.round(barHeight(day.total) * (day.done / day.total))
+// One segment per task, colored by its category (uncategorized = neutral):
+// done ones solid at the bottom, the rest dimmed above, so the bar still reads
+// as "this much of the day is done". Segments flex evenly, so no rounding drift.
+const catRank = (id: string | null) => {
+  const i = id ? categoriesStore.categories.findIndex(c => c.id === id) : -1
+  return i === -1 ? Number.MAX_SAFE_INTEGER : i
 }
-function barRemPx(day: { total: number; done: number }) {
-  return barHeight(day.total) - barDonePx(day)
+
+function barSegments(tasks: Task[]) {
+  const byCat = (a: Task, b: Task) => catRank(a.category_id) - catRank(b.category_id)
+  const part = (done: boolean) =>
+    tasks.filter(t => (t.status === 'done') === done).sort(byCat)
+      .map(t => ({ key: t.id, done, color: categoriesStore.color(t.category_id) ?? NO_CAT_COLOR }))
+  return [...part(false), ...part(true)]
 }
 
 function registerDay(day: { date: string; isToday: boolean }, el: unknown) {
@@ -252,7 +268,8 @@ async function load() {
   expanded.value = new Set()
   calendarsStore.fetchRange(monday.value, addDays(monday.value, 6)).catch(e => console.error(e))
   await tasksStore.fetchRange(monday.value, addDays(monday.value, 6))
-  if (isThisWeek.value) tasksStore.fetchOverdue()
+  // overdue is a side section: a failure (e.g. migration not run) mustn't break the week
+  if (isThisWeek.value) tasksStore.fetchOverdue().catch(e => console.error(e))
 }
 
 function shiftWeek(dir: number) {
@@ -364,8 +381,8 @@ onBeforeUnmount(() => {
 .chart-col { display: flex; flex-direction: column; align-items: center; gap: 7px; flex: 1; }
 .bar-area { height: 60px; display: flex; align-items: flex-end; }
 .bar { width: 16px; border-radius: 5px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
-.bar-rem { background: var(--color-border-secondary); }
-.bar-done { background: var(--color-text-success); }
+.bar-seg { flex: 1; min-height: 0; }
+.bar-seg.todo { opacity: .5; }
 .bar-empty { width: 4px; height: 4px; border-radius: 50%; background: var(--color-border-tertiary); }
 .chart-label { font-size: 12px; color: var(--color-text-tertiary); }
 .chart-label.red { color: var(--color-text-danger); font-weight: 500; }

@@ -427,7 +427,7 @@ async function doImport(e: Event) {
   dataMsg.value = ''; dataErr.value = false
   try {
     const res = await importBackup(file)
-    dataMsg.value = t('account.importDone', { n: res.tasks })
+    dataMsg.value = t('account.importDone', { n: res.tasks + res.events })
   } catch (err) {
     dataErr.value = true; dataMsg.value = (err as Error).message
   }

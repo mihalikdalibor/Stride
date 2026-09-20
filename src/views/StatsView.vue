@@ -133,6 +133,7 @@ import { addDays, getMonday, parseYmd, today, weekdayIndex, ymd } from '@/lib/da
 import { weeklyGoal } from '@/lib/goal'
 import { countEvents } from '@/lib/statsPrefs'
 import { eventToItem, taskToItem, type StatItem } from '@/lib/statsItems'
+import { currentStreak as streakOfCurrent, longestStreak as streakOfLongest } from '@/lib/streak'
 
 Chart.register(BarElement, CategoryScale, LinearScale, Tooltip)
 
@@ -175,7 +176,7 @@ const periodLabel = computed(() => {
 // tasks + (optionally) connected-calendar events: an event is done once it
 // has ended, planned before; it takes its feed's category
 const items = computed<StatItem[]>(() => {
-  const list = tasksStore.tasks.map(taskToItem)
+  const list = tasksStore.tasks.map(t => taskToItem(t, categoriesStore.countsToStreak(t.category_id)))
   if (!countEvents.value) return list
   const now = Date.now()
   for (const ev of calendarsStore.statsEvents) {
@@ -204,50 +205,9 @@ const weekDone = computed(() => {
 })
 const goalPct = computed(() => Math.min(100, Math.round(weekDone.value / weeklyGoal.value * 100)))
 
-// --- streaks: walk days backward; done day counts, missed breaks, empty skips ---
-const dayTotals = computed(() => {
-  const m = new Map<string, { total: number; done: number }>()
-  for (const i of items.value) {
-    const d = m.get(i.date) ?? { total: 0, done: 0 }
-    d.total++
-    if (i.done) d.done++
-    m.set(i.date, d)
-  }
-  return m
-})
-function dayState(date: string): 'done' | 'missed' | 'none' {
-  const d = dayTotals.value.get(date)
-  if (!d) return 'none'
-  return d.done === d.total ? 'done' : 'missed'
-}
-
-const currentStreak = computed(() => {
-  let streak = 0
-  let cursor = todayStr
-  // today still in progress shouldn't break the streak
-  if (dayState(cursor) !== 'done') cursor = addDays(cursor, -1)
-  for (let i = 0; i < 400; i++) {
-    const s = dayState(cursor)
-    if (s === 'done') streak++
-    else if (s === 'missed') break
-    cursor = addDays(cursor, -1)
-  }
-  return streak
-})
-
-const longestStreak = computed(() => {
-  const dates = [...dayTotals.value.keys()].sort()
-  if (!dates.length) return 0
-  let best = 0, run = 0
-  let cursor = dates[0]
-  while (cursor <= todayStr) {
-    const s = dayState(cursor)
-    if (s === 'done') { run++; best = Math.max(best, run) }
-    else if (s === 'missed') run = 0
-    cursor = addDays(cursor, 1)
-  }
-  return best
-})
+// --- streaks (src/lib/streak.ts): events and excluded categories are skipped ---
+const currentStreak = computed(() => streakOfCurrent(items.value, todayStr))
+const longestStreak = computed(() => streakOfLongest(items.value, todayStr))
 
 // --- chart adapts to the selected period ---
 const chartTitle = computed(() => {

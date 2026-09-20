@@ -167,12 +167,13 @@ Then run in the Supabase SQL Editor:
 
 ```sql
 create table categories (
-  id          uuid primary key default gen_random_uuid(),
-  user_id     uuid not null references auth.users (id) on delete cascade default auth.uid(),
-  name        text not null,
-  color       text not null default '#8E8E93',
-  position    int not null default 0,
-  created_at  timestamptz not null default now()
+  id                  uuid primary key default gen_random_uuid(),
+  user_id             uuid not null references auth.users (id) on delete cascade default auth.uid(),
+  name                text not null,
+  color               text not null default '#8E8E93',
+  position            int not null default 0,
+  exclude_from_streak boolean not null default false,
+  created_at          timestamptz not null default now()
 );
 
 create table tasks (
@@ -188,11 +189,13 @@ create table tasks (
   category_id  uuid references categories (id) on delete set null,
   note         text,
   position     int not null default 0,
+  series_id    uuid,
   created_at   timestamptz not null default now(),
   completed_at timestamptz
 );
 
 create index tasks_user_date_idx on tasks (user_id, task_date);
+create index tasks_series_idx on tasks (series_id) where series_id is not null;
 
 create table note_folders (
   id          uuid primary key default gen_random_uuid(),
@@ -230,19 +233,23 @@ create table calendar_feeds (
 create table calendar_events (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references auth.users (id) on delete cascade default auth.uid(),
-  feed_id     uuid not null references calendar_feeds (id) on delete cascade,
+  feed_id     uuid references calendar_feeds (id) on delete cascade,   -- null = manually added event
   uid         text not null,
   title       text not null,
   location    text,
+  note        text,
   starts_at   timestamptz not null,
   ends_at     timestamptz not null,
   all_day     boolean not null default false,
   hidden      boolean not null default false,
+  category_id uuid references categories (id) on delete set null,      -- manual events; feed events inherit the feed's
+  series_id   uuid,
   synced_at   timestamptz not null default now(),
   unique (feed_id, uid)
 );
 
 create index calendar_events_user_start_idx on calendar_events (user_id, starts_at);
+create index calendar_events_series_idx on calendar_events (series_id) where series_id is not null;
 
 alter table tasks        enable row level security;
 alter table categories   enable row level security;
@@ -318,6 +325,21 @@ If your database was created before the Notes feature, run the `note_folders`/`n
 ### Migration — connected calendars (iCal)
 
 If your database was created before connected calendars, run the `calendar_feeds`/`calendar_events` `create table` + index + RLS blocks above (additive), then deploy the `calendar-sync` Edge Function (below).
+
+### Migration — streak exclusion, manual events, series
+
+```sql
+alter table categories add column if not exists exclude_from_streak boolean not null default false;
+
+alter table tasks add column if not exists series_id uuid;
+create index if not exists tasks_series_idx on tasks (series_id) where series_id is not null;
+
+alter table calendar_events alter column feed_id drop not null;
+alter table calendar_events add column if not exists category_id uuid references categories (id) on delete set null;
+alter table calendar_events add column if not exists note text;
+alter table calendar_events add column if not exists series_id uuid;
+create index if not exists calendar_events_series_idx on calendar_events (series_id) where series_id is not null;
+```
 
 </details>
 

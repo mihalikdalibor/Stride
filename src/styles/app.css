@@ -142,19 +142,32 @@ button{font-family:inherit;}
 .calm-cell{height:52px;display:flex;flex-direction:column;align-items:center;padding-top:5px;gap:3px;background:none;border:none;cursor:pointer;}
 .calm-num{font-size:15px;color:var(--color-text-primary);width:27px;height:27px;display:flex;align-items:center;justify-content:center;border-radius:50%;}
 .calm-num.t{background:var(--color-text-danger);color:#fff;font-weight:500;}
-.calm-meta{display:flex;align-items:center;gap:4px;height:12px;}
-.calm-dot{width:6px;height:6px;border-radius:50%;}
+.calm-meta{display:flex;align-items:center;gap:4px;height:14px;}
+.calm-dot{width:12px;height:12px;border-radius:50%;}
 .calm-cnt{font-size:11px;color:var(--color-text-secondary);}
+
+/* Day dot: the hue is the day's categories (src/lib/dayColors.ts), the
+   treatment is its status — done solid, planned dimmed, missed a ring. */
+.calm-dot.is-planned,.yr2-d.is-planned{opacity:.6;}
+.calm-dot.is-missed,.yr2-d.is-missed{
+  -webkit-mask:radial-gradient(closest-side,transparent 55%,#000 56%);
+  mask:radial-gradient(closest-side,transparent 55%,#000 56%);
+}
+/* without mask support the ring would fall back to a solid dot, i.e. read as
+   "done" — the one wrong answer; outline it instead */
+@supports not (mask:radial-gradient(#000,#000)){
+  .calm-dot.is-missed,.yr2-d.is-missed{opacity:.6;box-shadow:0 0 0 1px var(--color-text-danger);}
+}
 
 /* year grid */
 .yr2{display:grid;grid-template-columns:repeat(3,1fr);gap:16px 6px;}
 .yr2-lab{font-size:14px;font-weight:500;color:var(--color-text-primary);margin-bottom:5px;padding-left:2px;background:none;border:none;cursor:pointer;text-align:left;width:100%;}
 .yr2-lab.cur{color:var(--color-text-danger);}
 .yr2-g{display:grid;grid-template-columns:repeat(7,1fr);}
-.yr2-c{height:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;}
+.yr2-c{height:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;}
 .yr2-n{font-size:11px;color:var(--color-text-secondary);line-height:1;width:14px;height:14px;display:flex;align-items:center;justify-content:center;border-radius:50%;}
 .yr2-n.t{background:var(--color-text-danger);color:#fff;}
-.yr2-d{width:3.5px;height:3.5px;border-radius:50%;}
+.yr2-d{width:7px;height:7px;border-radius:50%;}
 
 /* Prevent iOS Safari viewport zoom on input focus (triggered when font-size < 16px) */
 @media (hover:none) and (pointer:coarse){
