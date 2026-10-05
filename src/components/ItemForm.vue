@@ -105,8 +105,11 @@
       </template>
     </template>
 
+    <!-- an activity created on a past day is saved as done (tasks store) -->
+    <p v-if="pastDone" class="form-hint">{{ t('item.pastDone') }}</p>
+
     <!-- edit: series scope, delete, move to another day -->
-    <div v-else class="edit-bottom">
+    <div v-if="isEdit" class="edit-bottom">
       <template v-if="moveOpen">
         <span class="eb-q">{{ t('day.moveTo') }}</span>
         <input type="date" v-model="date" class="date-input">
@@ -223,6 +226,8 @@ const dates = computed<string[]>(() => {
 })
 
 const canSubmit = computed(() => !!title.value.trim() && dates.value.length > 0)
+// adding an activity (or turning an event into one) on a past date creates it done
+const pastDone = computed(() => kind.value === 'task' && !props.task && dates.value.some(d => d < today()))
 
 onMounted(async () => {
   await nextTick()

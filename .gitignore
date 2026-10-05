@@ -12,3 +12,4 @@ sw.js
 workbox-*.js
 precache-manifest.*.js
 claude-commands
+.claude/plans/

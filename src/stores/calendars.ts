@@ -121,9 +121,13 @@ export const useCalendarsStore = defineStore('calendars', () => {
   }
 
   // Stats range (e.g. a year)
+  // a superseded call (Stats widening its range) must not overwrite a newer result
   async function fetchStatsRange(from: string, to: string) {
-    statsRange = { from, to }
-    statsEvents.value = isDemo ? demoRange(from, to) : await fetchPaged(from, to)
+    const mine = { from, to }
+    statsRange = mine
+    const rows = isDemo ? demoRange(from, to) : await fetchPaged(from, to)
+    if (statsRange !== mine) return
+    statsEvents.value = rows
   }
 
   // the Calendar grid's cumulative span — feeds the day dots' category colors.

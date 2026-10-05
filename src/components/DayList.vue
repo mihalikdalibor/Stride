@@ -154,13 +154,11 @@
       </button>
     </div>
 
-    <template v-if="canAdd">
-      <ItemForm v-if="adding" :date="date" @save="submitAdd" @cancel="adding = false" />
-      <button v-else type="button" class="trow trow-add" @click="openAdd">
-        <span class="check dashed"><i class="ti ti-plus"></i></span>
-        <span class="row-text muted">{{ t('day.addItem') }}</span>
-      </button>
-    </template>
+    <ItemForm v-if="adding" :date="date" @save="submitAdd" @cancel="adding = false" />
+    <button v-else type="button" class="trow trow-add" @click="openAdd">
+      <span class="check dashed"><i class="ti ti-plus"></i></span>
+      <span class="row-text muted">{{ t('day.addItem') }}</span>
+    </button>
   </div>
 </template>
 
@@ -429,8 +427,6 @@ async function removeManualEvent(ev: CalendarEvent, scope: ItemDraft['scope']) {
 }
 
 const isToday = computed(() => props.date === today())
-// Add is allowed on today + future days only (past days have no add affordance).
-const canAdd = computed(() => props.date >= today())
 const dayName = computed(() => fmt.dayName(props.date))
 const dateLabel = computed(() => fmt.dayMonthLabel(props.date))
 const doneCount = computed(() => props.tasks.filter(t => t.status === 'done').length)

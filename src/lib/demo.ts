@@ -29,6 +29,9 @@ export const DEMO_CATEGORIES: Category[] = [
   { id: 'demo-cat-2', name: 'Study', color: '#af52de', position: 1, exclude_from_streak: false },
   { id: 'demo-cat-3', name: 'Fitness', color: '#34c759', position: 2, exclude_from_streak: false },
   { id: 'demo-cat-4', name: 'Personal', color: '#ff9500', position: 3, exclude_from_streak: false },
+  // subcategories of Work (inherit its color + streak flag)
+  { id: 'demo-cat-5', name: 'Client A', color: '#007aff', position: 0, exclude_from_streak: false, parent_id: 'demo-cat-1' },
+  { id: 'demo-cat-6', name: 'Client B', color: '#007aff', position: 1, exclude_from_streak: false, parent_id: 'demo-cat-1' },
 ]
 const CAT = DEMO_CATEGORIES.map(c => c.id)
 
@@ -47,7 +50,7 @@ const WEEK_PLAN: Plan[][] = [
   // Tuesday
   [
     { title: 'Team standup', cat: 0, time: '09:30', dur: 15, repeat: 'daily' },
-    { title: 'Review pull requests', cat: 0, time: '10:30', dur: 45 },
+    { title: 'Review pull requests', cat: 4, time: '10:30', dur: 45 },
     { title: 'Evening walk', cat: 3, time: '19:00', dur: 30 },
   ],
   // Wednesday
@@ -59,12 +62,12 @@ const WEEK_PLAN: Plan[][] = [
   // Thursday
   [
     { title: 'Team standup', cat: 0, time: '09:30', dur: 15, repeat: 'daily' },
-    { title: 'Design review', cat: 0, time: '13:00', dur: 60 },
+    { title: 'Design review', cat: 5, time: '13:00', dur: 60 },
     { title: 'Yoga session', cat: 2, time: '18:30', dur: 45 },
   ],
   // Friday
   [
-    { title: 'Finish slides', cat: 0, time: '10:00', dur: 90, priority: true },
+    { title: 'Finish slides', cat: 4, time: '10:00', dur: 90, priority: true },
     { title: 'Gym — pull day', cat: 2, time: '18:30', dur: 60 },
   ],
   // Saturday
@@ -83,10 +86,10 @@ const WEEK_PLAN: Plan[][] = [
 // Pool used for other (past/future) weeks — keeps Calendar/Stats looking varied.
 const POOL: { title: string; cat: number }[] = [
   { title: 'Team standup', cat: 0 },
-  { title: 'Review pull requests', cat: 0 },
+  { title: 'Review pull requests', cat: 4 },
   { title: 'Deep work block', cat: 0 },
   { title: 'Answer emails', cat: 0 },
-  { title: 'Design review', cat: 0 },
+  { title: 'Design review', cat: 5 },
   { title: 'Write thesis intro', cat: 1 },
   { title: 'Read 20 pages', cat: 1 },
   { title: 'Research sources', cat: 1 },

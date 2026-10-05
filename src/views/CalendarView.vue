@@ -152,7 +152,8 @@ const dayIndex = computed(() => {
 })
 
 // the user's category order, so the same mix always draws the same dot
-const catOrder = computed(() => categoriesStore.categories.map(c => c.color))
+// (subcategories draw in their parent's color, so top-level is enough)
+const catOrder = computed(() => categoriesStore.topLevel.map(c => c.color))
 
 // shared read-only fallback for days with nothing on them
 const EMPTY: DayBucket = Object.freeze({ tasks: Object.freeze([]) as unknown as Task[], events: Object.freeze([]) as unknown as CalendarEvent[] })

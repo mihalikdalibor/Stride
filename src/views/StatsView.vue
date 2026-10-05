@@ -2,9 +2,37 @@
   <div class="stats">
     <div class="top">
       <div class="seg">
-        <button v-for="p in periods" :key="p" :class="{ on: period === p }" @click="period = p">
+        <button v-for="p in periods" :key="p" :class="{ on: period === p }" @click="setPeriod(p)">
           {{ t('stats.' + p) }}
         </button>
+      </div>
+      <!-- custom period: applied on change (not per keystroke), normalized -->
+      <div v-if="period === 'custom'" class="range-row">
+        <input
+          type="date"
+          class="range-input"
+          :value="customRange.from"
+          :min="bounds.from"
+          :max="bounds.to"
+          :aria-label="t('stats.rangeFrom')"
+          :title="t('stats.rangeFrom')"
+          @change="onRangeChange('from', $event)"
+        >
+        <span class="range-sep">–</span>
+        <input
+          type="date"
+          class="range-input"
+          :value="customRange.to"
+          :min="bounds.from"
+          :max="bounds.to"
+          :aria-label="t('stats.rangeTo')"
+          :title="t('stats.rangeTo')"
+          @change="onRangeChange('to', $event)"
+        >
+      </div>
+      <!-- category filter: applies to everything below (incl. streaks + goal) -->
+      <div v-if="categoriesStore.categories.length" class="stats-filter">
+        <CategoryFilter v-model="statsSelectedCats" with-none />
       </div>
     </div>
 
@@ -70,11 +98,30 @@
         </div>
       </div>
       <template v-if="catBreakdown.length">
-        <div v-for="c in catBreakdown" :key="c.name" class="cat-row">
-          <span class="cat-name">{{ c.name }}</span>
-          <div class="cat-track"><div class="cat-fill" :style="{ width: c.pct + '%', background: c.color }"></div></div>
-          <span class="cat-val">{{ c.label }}</span>
-        </div>
+        <!-- one row per top-level category (subcategories summed in); a row
+             with subcategories expands to show them -->
+        <template v-for="c in catBreakdown" :key="c.id">
+          <div class="cat-row">
+            <button
+              v-if="c.children.length"
+              type="button"
+              class="cat-name cat-expand"
+              :aria-expanded="expandedCats.has(c.id)"
+              @click="toggleExpand(c.id)"
+              :title="c.name"
+            ><i class="ti" :class="expandedCats.has(c.id) ? 'ti-chevron-down' : 'ti-chevron-right'"></i><span class="cat-expand-text">{{ c.name }}</span></button>
+            <span v-else class="cat-name" :title="c.name">{{ c.name }}</span>
+            <div class="cat-track"><div class="cat-fill" :style="{ width: c.pct + '%', background: c.color }"></div></div>
+            <span class="cat-val">{{ c.label }}</span>
+          </div>
+          <template v-if="c.children.length && expandedCats.has(c.id)">
+            <div v-for="sc in c.children" :key="sc.id" class="cat-row sub">
+              <span class="cat-name" :title="sc.name">{{ sc.name }}</span>
+              <div class="cat-track"><div class="cat-fill" :style="{ width: sc.pct + '%', background: sc.color }"></div></div>
+              <span class="cat-val">{{ sc.label }}</span>
+            </div>
+          </template>
+        </template>
       </template>
       <p v-else class="block-note">{{ t('stats.noneDone') }}</p>
     </section>
@@ -119,14 +166,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Bar } from 'vue-chartjs'
 import {
   Chart, BarElement, CategoryScale, LinearScale, Tooltip,
 } from 'chart.js'
 import { useI18n } from 'vue-i18n'
+import CategoryFilter from '@/components/CategoryFilter.vue'
 import { useTasksStore } from '@/stores/tasks'
-import { useCategoriesStore } from '@/stores/categories'
+import { NO_CAT, useCategoriesStore } from '@/stores/categories'
 import { useCalendarsStore } from '@/stores/calendars'
 import { useFmt } from '@/i18n/dates'
 import { addDays, getMonday, parseYmd, today, weekdayIndex, ymd } from '@/lib/dates'
@@ -134,6 +182,10 @@ import { weeklyGoal } from '@/lib/goal'
 import { countEvents } from '@/lib/statsPrefs'
 import { eventToItem, taskToItem, type StatItem } from '@/lib/statsItems'
 import { currentStreak as streakOfCurrent, longestStreak as streakOfLongest } from '@/lib/streak'
+import {
+  customRange, granularity, normalizeRange, rangeBounds, rangeBuckets, statsPeriod, statsSelectedCats,
+  type Range, type StatsPeriod,
+} from '@/lib/statsRange'
 
 Chart.register(BarElement, CategoryScale, LinearScale, Tooltip)
 
@@ -144,8 +196,24 @@ const categoriesStore = useCategoriesStore()
 const calendarsStore = useCalendarsStore()
 const todayStr = today()
 
-const periods = ['week', 'month', 'year'] as const
-const period = ref<'week' | 'month' | 'year'>('week')
+// the period, custom range and category filter are session state (statsRange.ts)
+const periods: StatsPeriod[] = ['week', 'month', 'year', 'custom']
+const period = statsPeriod
+function setPeriod(p: StatsPeriod) { period.value = p }
+const bounds = rangeBounds()
+
+// a date input changed: normalize (swap / clamp) or, if invalid, show the old value again
+function onRangeChange(end: 'from' | 'to', e: Event) {
+  const input = e.target as HTMLInputElement
+  const cur = customRange.value
+  const next = normalizeRange(end === 'from' ? input.value : cur.from, end === 'to' ? input.value : cur.to)
+  if (next) customRange.value = next
+  input.value = (next ?? cur)[end]
+}
+// how the custom period's chart is bucketed (≤ 31 days → days, ≤ 26 weeks → weeks, else months)
+const gran = computed(() => granularity(customRange.value.from, customRange.value.to))
+const customSpansYears = computed(() =>
+  parseYmd(customRange.value.from).getFullYear() !== parseYmd(customRange.value.to).getFullYear())
 const chartMode = ref<'count' | 'percent'>('count')
 const catMode = ref<'count' | 'hours'>('count')
 
@@ -154,8 +222,9 @@ function cssVar(name: string) {
 }
 
 // --- period range (inclusive) ---
-const periodRange = computed(() => {
+const periodRange = computed<Range>(() => {
   const d = parseYmd(todayStr)
+  if (period.value === 'custom') return customRange.value
   if (period.value === 'week') return { from: getMonday(todayStr), to: addDays(getMonday(todayStr), 6) }
   if (period.value === 'month') {
     return {
@@ -168,22 +237,25 @@ const periodRange = computed(() => {
 
 const periodLabel = computed(() => {
   const d = parseYmd(todayStr)
+  if (period.value === 'custom') return fmt.dateRange(customRange.value.from, customRange.value.to)
   if (period.value === 'week') return t('stats.thisWeek')
   if (period.value === 'month') return fmt.monthName(d.getMonth())
   return String(d.getFullYear())
 })
 
 // tasks + (optionally) connected-calendar events: an event is done once it
-// has ended, planned before; it takes its feed's category
+// has ended, planned before; it takes its feed's category. The category filter
+// is applied here, so everything below (streaks and goal included) follows it.
 const items = computed<StatItem[]>(() => {
   const list = tasksStore.tasks.map(t => taskToItem(t, categoriesStore.countsToStreak(t.category_id)))
-  if (!countEvents.value) return list
-  const now = Date.now()
-  for (const ev of calendarsStore.statsEvents) {
-    const item = eventToItem(ev, calendarsStore.categoryOf(ev), now)
-    if (item) list.push(item)
+  if (countEvents.value) {
+    const now = Date.now()
+    for (const ev of calendarsStore.statsEvents) {
+      const item = eventToItem(ev, calendarsStore.categoryOf(ev), now)
+      if (item) list.push(item)
+    }
   }
-  return list
+  return list.filter(i => categoriesStore.matchesFilter(i.category_id, statsSelectedCats.value))
 })
 const doneItems = computed(() => items.value.filter(i => i.done))
 
@@ -212,6 +284,9 @@ const longestStreak = computed(() => streakOfLongest(items.value, todayStr))
 // --- chart adapts to the selected period ---
 const chartTitle = computed(() => {
   if (chartMode.value === 'percent') return t('stats.completion')
+  if (period.value === 'custom') {
+    return gran.value === 'day' ? t('stats.byDay') : gran.value === 'week' ? t('stats.byWeek') : t('stats.byMonth')
+  }
   return period.value === 'week' ? t('stats.byDay')
     : period.value === 'month' ? t('stats.byWeek')
       : t('stats.byMonth')
@@ -228,7 +303,17 @@ const buckets = computed(() => {
   const list: { label: string; done: number; total: number; isCurrent: boolean }[] = []
   const push = (label: string, from: string, to: string, isCurrent: boolean) =>
     list.push({ label, done: doneBetween(from, to), total: totalBetween(from, to), isCurrent })
-  if (period.value === 'week') {
+  if (period.value === 'custom') {
+    // the chosen range, clipped buckets (days / Monday-start weeks / months)
+    const { from, to } = customRange.value
+    for (const b of rangeBuckets(from, to, gran.value)) {
+      const d = parseYmd(b.from)
+      const label = gran.value === 'month'
+        ? fmt.monthShort(d.getMonth()) + (customSpansYears.value ? ` '${String(d.getFullYear()).slice(2)}` : '')
+        : `${d.getDate()}.${d.getMonth() + 1}`
+      push(label, b.from, b.to, b.from <= todayStr && todayStr <= b.to)
+    }
+  } else if (period.value === 'week') {
     // current week, day by day (Po–Ne)
     const mon = getMonday(todayStr)
     const letters = fmt.dayLetters()
@@ -237,12 +322,11 @@ const buckets = computed(() => {
       push(letters[i], d, d, d === todayStr)
     }
   } else if (period.value === 'month') {
-    // last 6 weeks
-    const mondayThis = getMonday(todayStr)
-    for (let i = 5; i >= 0; i--) {
-      const mon = addDays(mondayThis, -7 * i)
-      const md = parseYmd(mon)
-      push(`${md.getDate()}.${md.getMonth() + 1}`, mon, addDays(mon, 6), i === 0)
+    // Monday-start weeks of the current month, first/last clipped to it
+    const { from, to } = periodRange.value
+    for (const b of rangeBuckets(from, to, 'week')) {
+      const bd = parseYmd(b.from)
+      push(`${bd.getDate()}.${bd.getMonth() + 1}`, b.from, b.to, b.from <= todayStr && todayStr <= b.to)
     }
   } else {
     // 12 months of the current year
@@ -283,6 +367,7 @@ const chartData = computed(() => {
 const valueLabels = {
   id: 'valueLabels',
   afterDatasetsDraw(chart: any) {
+    if (chart.data.labels.length > 14) return // too many bars — labels would overlap
     const ctx = chart.ctx
     const meta = chart.getDatasetMeta(0)
     const percent = chartMode.value === 'percent'
@@ -332,8 +417,9 @@ const chartOptions = computed<any>(() => {
 })
 
 // insight adapts to the period: week → strongest weekday, month → strongest
-// week, year → strongest month
+// week, year → strongest month; a custom period uses its chart unit, over the range
 const insight = computed(() => {
+  if (period.value === 'custom') return customInsight()
   const tasks = doneItems.value
   if (!tasks.length) return null
 
@@ -347,9 +433,12 @@ const insight = computed(() => {
 
   if (period.value === 'month') {
     const counts = new Map<string, number>()
+    const { from, to } = periodRange.value
     for (const task of tasks) {
+      if (task.date < from || task.date > to) continue
       const mon = getMonday(task.date)
-      counts.set(mon, (counts.get(mon) ?? 0) + 1)
+      const key = mon < from ? from : mon // clipped week, same label as the chart
+      counts.set(key, (counts.get(key) ?? 0) + 1)
     }
     let best = '', bestN = 0
     for (const [mon, n] of counts) if (n > bestN) { bestN = n; best = mon }
@@ -365,6 +454,31 @@ const insight = computed(() => {
   if (!max) return null
   return t('stats.strongestMonth', { month: fmt.monthName(counts.indexOf(max)) })
 })
+
+function customInsight(): string | null {
+  const done = periodItems.value.filter(i => i.done)
+  if (!done.length) return null
+  const best = (key: (date: string) => string) => {
+    const counts = new Map<string, number>()
+    for (const i of done) counts.set(key(i.date), (counts.get(key(i.date)) ?? 0) + 1)
+    let top = '', n = 0
+    for (const [k, c] of counts) if (c > n) { n = c; top = k }
+    return top
+  }
+  if (gran.value === 'day') {
+    const wd = Number(best(d => String(weekdayIndex(d))))
+    return t('stats.strongestDay', { day: fmt.dayName(addDays(getMonday(todayStr), wd)) })
+  }
+  if (gran.value === 'week') {
+    // the bucket's start, as on the chart (the first week is clipped to the range)
+    const from = customRange.value.from
+    const md = parseYmd(best(d => (getMonday(d) < from ? from : getMonday(d))))
+    return t('stats.strongestWeek', { week: `${md.getDate()}.${md.getMonth() + 1}` })
+  }
+  const md = parseYmd(best(d => d.slice(0, 7) + '-01'))
+  const month = fmt.monthName(md.getMonth()) + (customSpansYears.value ? ` ${md.getFullYear()}` : '')
+  return t('stats.strongestMonth', { month })
+}
 
 // GitHub-style activity heatmap (last ~26 weeks, columns = weeks, rows = Mon–Sun)
 const HEAT_WEEKS = 26
@@ -400,68 +514,130 @@ function heatMonthLabel(wi: number): string {
   return m !== prev ? fmt.monthShort(m) : ''
 }
 
-function catMeta(id: string) {
-  if (id === NO_CAT) return { name: t('stats.noCategory'), color: 'var(--color-text-tertiary)' }
-  return {
-    name: categoriesStore.byId.get(id)?.name ?? t('stats.deletedCategory'),
-    color: categoriesStore.byId.get(id)?.color ?? 'var(--color-text-info)',
-  }
+function catName(id: string) {
+  if (id === NO_CAT) return t('stats.noCategory')
+  return categoriesStore.byId.get(id)?.name ?? t('stats.deletedCategory')
+}
+function catColor(id: string) {
+  if (id === NO_CAT) return 'var(--color-text-tertiary)'
+  return categoriesStore.color(id) ?? 'var(--color-text-info)'
 }
 function fmtH(min: number) {
   return Math.round(min / 60 * 10) / 10
 }
 
-// per category within the selected period (incl. "Bez kategórie"), sorted desc:
-// count mode = done count; hours mode = done h / planned h (items with a duration set)
-const NO_CAT = '__none__'
+// per category within the selected period (incl. "Bez kategórie"), sorted desc,
+// grouped by top-level category (a subcategory's items count toward its parent;
+// the row expands to show them). Count mode = done count; hours mode = done h /
+// planned h (items with a duration set).
+type Agg = { val: number; done: number }
+type CatRow = { id: string; name: string; color: string; val: number; done: number; label: string; pct: number }
+const expandedCats = ref(new Set<string>())
+function toggleExpand(id: string) {
+  const s = new Set(expandedCats.value)
+  s.has(id) ? s.delete(id) : s.add(id)
+  expandedCats.value = s
+}
+// a deleted category keeps its own row (it's no longer anyone's child)
+const groupKey = (key: string) =>
+  (key === NO_CAT || !categoriesStore.byId.has(key) ? key : categoriesStore.rootId(key))
+
 const catBreakdown = computed(() => {
-  if (catMode.value === 'hours') {
-    const done = new Map<string, number>()
-    const total = new Map<string, number>()
-    for (const i of periodItems.value) {
-      if (i.minutes == null) continue
-      const key = i.category_id ?? NO_CAT
-      total.set(key, (total.get(key) ?? 0) + i.minutes)
-      if (i.done) done.set(key, (done.get(key) ?? 0) + i.minutes)
-    }
-    return [...total.entries()].map(([id, totalMin]) => {
-      const doneMin = done.get(id) ?? 0
-      return {
-        ...catMeta(id),
-        val: totalMin,
-        label: `${fmtH(doneMin)}h / ${fmtH(totalMin)}h`,
-        pct: Math.round(doneMin / totalMin * 100),
-      }
-    }).sort((a, b) => b.val - a.val || b.pct - a.pct)
+  const hours = catMode.value === 'hours'
+  const agg = new Map<string, Agg>()
+  for (const i of periodItems.value) {
+    if (hours ? i.minutes == null : !i.done) continue
+    const key = i.category_id ?? NO_CAT
+    const amount = hours ? i.minutes! : 1
+    const a = agg.get(key) ?? { val: 0, done: 0 }
+    a.val += amount
+    if (i.done) a.done += amount
+    agg.set(key, a)
+  }
+  const groups = new Map<string, Map<string, Agg>>()
+  for (const [key, a] of agg) {
+    const g = groupKey(key)
+    if (!groups.has(g)) groups.set(g, new Map())
+    groups.get(g)!.set(key, a)
   }
 
-  const counts = new Map<string, number>()
-  for (const i of periodItems.value) {
-    if (!i.done) continue
-    const key = i.category_id ?? NO_CAT
-    counts.set(key, (counts.get(key) ?? 0) + 1)
-  }
-  const rows = [...counts.entries()].map(([id, val]) => ({ ...catMeta(id), val, label: String(val) }))
-    .sort((a, b) => b.val - a.val)
+  const row = (id: string, a: Agg, name: string, colorOf = id): CatRow => ({
+    id, name, color: catColor(colorOf), val: a.val, done: a.done, pct: 0,
+    label: hours ? `${fmtH(a.done)}h / ${fmtH(a.val)}h` : String(a.val),
+  })
+  const bySize = (x: CatRow, y: CatRow) => y.val - x.val || y.done - x.done
+  const rows = [...groups].map(([root, members]) => {
+    let total: Agg = { val: 0, done: 0 }
+    for (const a of members.values()) total = { val: total.val + a.val, done: total.done + a.done }
+    const subs = [...members].filter(([k]) => k !== root)
+    const own = members.get(root)
+    const children = subs.length
+      ? [
+        ...subs.map(([k, a]) => row(k, a, catName(k))),
+        ...(own ? [row(`${root}:direct`, own, t('stats.directly'), root)] : []),
+      ].sort(bySize)
+      : []
+    return { ...row(root, total, catName(root)), children }
+  }).sort(bySize)
+
+  // hours: share of planned time done; count: relative to the biggest row
   const max = Math.max(1, ...rows.map(r => r.val))
-  return rows.map(r => ({ ...r, pct: Math.round(r.val / max * 100) }))
+  const pct = (r: CatRow) => (hours ? Math.round(r.done / r.val * 100) : Math.round(r.val / max * 100))
+  return rows.map(r => ({ ...r, pct: pct(r), children: r.children.map(c => ({ ...c, pct: pct(c) })) }))
 })
 
-onMounted(async () => {
+// --- data window ---
+// A year of history (periods, charts, streaks) up to the end of the
+// current year / week, so planned future items count too; widened to cover a
+// custom period that reaches outside it.
+function neededRange(): Range {
   const d = parseYmd(todayStr)
-  // a year of history (periods, 6-week chart, streaks) up to the end of the
-  // current year / week, so planned future items count too
-  const from = ymd(new Date(d.getFullYear() - 1, d.getMonth(), 1))
   const yearEnd = ymd(new Date(d.getFullYear(), 11, 31))
   const weekEnd = addDays(getMonday(todayStr), 6)
-  const to = weekEnd > yearEnd ? weekEnd : yearEnd
+  let from = ymd(new Date(d.getFullYear() - 1, d.getMonth(), 1))
+  let to = weekEnd > yearEnd ? weekEnd : yearEnd
+  if (period.value === 'custom') {
+    if (customRange.value.from < from) from = customRange.value.from
+    if (customRange.value.to > to) to = customRange.value.to
+  }
+  return { from, to }
+}
+
+let loaded: Range | null = null
+async function loadRange(r: Range) {
+  // the stores drop a response that a newer call has superseded; the window
+  // only counts as loaded once the tasks arrived (a failure is retried later)
+  const prev = loaded
+  loaded = r
+  try {
+    await Promise.all([
+      tasksStore.fetchRange(r.from, r.to),
+      calendarsStore.loadFeeds()
+        .then(() => calendarsStore.fetchStatsRange(r.from, r.to))
+        .catch(e => console.error('stats events failed', e)), // tasks-only stats still work
+    ])
+  } catch (e) {
+    if (loaded === r) loaded = prev
+    throw e
+  }
+}
+
+// picking "Vlastné" or a new range outside the loaded window fetches the
+// union (debounced, so quick edits cause one load)
+let reloadTimer: ReturnType<typeof setTimeout> | undefined
+watch([period, customRange], () => {
+  clearTimeout(reloadTimer)
+  reloadTimer = setTimeout(() => {
+    const need = neededRange()
+    if (loaded && need.from >= loaded.from && need.to <= loaded.to) return
+    loadRange(need).catch(e => console.error('stats load failed', e))
+  }, 300)
+})
+onBeforeUnmount(() => clearTimeout(reloadTimer))
+
+onMounted(async () => {
   calendarsStore.init()
-  await Promise.all([
-    tasksStore.fetchRange(from, to),
-    calendarsStore.loadFeeds()
-      .then(() => calendarsStore.fetchStatsRange(from, to))
-      .catch(e => console.error('stats events failed', e)), // tasks-only stats still work
-  ])
+  await loadRange(neededRange())
   // show the most recent weeks first
   await nextTick()
   if (heatEl.value) heatEl.value.scrollLeft = heatEl.value.scrollWidth
@@ -527,7 +703,27 @@ onMounted(async () => {
 .heat-legend { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 10px; font-size: 11px; color: var(--color-text-tertiary); }
 .heat-legend .heat-cell { width: 11px; height: 11px; }
 
+.stats-filter { display: flex; margin-top: 10px; }
+.range-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.range-input {
+  flex: 1; min-width: 0; height: 34px; padding: 0 10px;
+  border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md);
+  background: var(--color-background-primary); color: var(--color-text-primary);
+  font-size: 14px; font-family: inherit;
+}
+.range-input:focus { outline: none; border-color: var(--color-text-info); }
+.range-sep { color: var(--color-text-tertiary); flex-shrink: 0; }
 .cat-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+/* expanded subcategory rows sit indented under their parent */
+.cat-row.sub .cat-name { padding-left: 16px; width: 96px; box-sizing: border-box; }
+.cat-row.sub .cat-track { height: 6px; }
+.cat-expand {
+  display: flex; align-items: center; gap: 2px; text-align: left;
+  border: none; background: none; padding: 0; cursor: pointer; font-family: inherit;
+}
+.cat-expand i { font-size: 13px; flex-shrink: 0; margin-left: -2px; }
+.cat-expand-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cat-expand:focus-visible { outline: 2px solid var(--color-text-info); outline-offset: 2px; border-radius: 4px; }
 .cat-row:last-child { margin-bottom: 0; }
 .cat-name {
   font-size: 13px; color: var(--color-text-secondary);

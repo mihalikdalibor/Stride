@@ -41,24 +41,36 @@ export const useTasksStore = defineStore('tasks', () => {
     if (error) throw error
   }
 
-  // e.g. Monday–Sunday of a week ('2026-06-08', '2026-06-14')
+  // e.g. Monday–Sunday of a week ('2026-06-08', '2026-06-14'). Paged past
+  // PostgREST's 1000-row cap (Stats loads long ranges); a call that's been
+  // superseded by a newer one never overwrites its result.
   async function fetchRange(from: string, to: string) {
+    const mine = { from, to }
     loading.value = true
-    range = { from, to }
+    range = mine
     try {
       if (isDemo) {
         tasks.value = demoTasksForRange(from, to)
         return
       }
-      const { data, error } = await supabase
-        .from('tasks').select('*')
-        .gte('task_date', from).lte('task_date', to)
-        .order('task_date', { ascending: true })
-        .order('position', { ascending: true })
-      if (error) throw error
-      tasks.value = data ?? []
+      const PAGE = 1000
+      const rows: Task[] = []
+      for (let i = 0; ; i += PAGE) {
+        const { data, error } = await supabase
+          .from('tasks').select('*')
+          .gte('task_date', from).lte('task_date', to)
+          .order('task_date', { ascending: true })
+          .order('position', { ascending: true })
+          .order('id', { ascending: true })
+          .range(i, i + PAGE - 1)
+        if (error) throw error
+        rows.push(...(data ?? []))
+        if (!data || data.length < PAGE) break
+      }
+      if (range !== mine) return
+      tasks.value = rows
     } finally {
-      loading.value = false
+      if (range === mine) loading.value = false
     }
   }
 
@@ -111,7 +123,9 @@ export const useTasksStore = defineStore('tasks', () => {
   type NewTask = Pick<Task, 'title' | 'task_time' | 'duration_min' | 'category_id' | 'note'>
 
   /** Create the task on each of `dates` (one day, several picked days, or an
-   *  expanded repeat rule). `series_id` groups the occurrences of a rule. */
+   *  expanded repeat rule). `series_id` groups the occurrences of a rule.
+   *  A task dated before today is created done (logging something already
+   *  done); today and future dates start as todo. */
   async function addTasks(fields: NewTask, dates: string[], series_id: string | null = null): Promise<Task[]> {
     if (!dates.length) return []
     // `nextPosition` only sees the loaded range, so the days outside it are
@@ -131,16 +145,19 @@ export const useTasksStore = defineStore('tasks', () => {
     const nextFor = (date: string) =>
       inRange(date) ? nextPosition(date) : (lastOutside.get(date) ?? -1) + 1
     const used = new Map<string, number>()
+    const todayStr = today()
+    const now = new Date().toISOString()
     const rows = dates.map(task_date => {
       const position = used.get(task_date) ?? nextFor(task_date)
       used.set(task_date, position + 1)
-      return { ...fields, task_date, series_id, position }
+      const past = task_date < todayStr
+      const status: TaskStatus = past ? 'done' : 'todo'
+      return { ...fields, task_date, series_id, position, status, completed_at: past ? now : null }
     })
     if (isDemo) {
       const made: Task[] = rows.map(r => ({
         ...r, id: `demo-${crypto.randomUUID()}`,
-        priority: false, repeat: 'none' as TaskRepeat, status: 'todo' as TaskStatus,
-        created_at: new Date().toISOString(), completed_at: null,
+        priority: false, repeat: 'none' as TaskRepeat, created_at: now,
       }))
       made.filter(r => inRange(r.task_date)).forEach(r => tasks.value.push(r))
       return made

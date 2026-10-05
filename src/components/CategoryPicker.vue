@@ -2,15 +2,18 @@
   <div class="picker" ref="pickerEl" @wheel="onWheel">
     <button type="button" class="chip" :class="{ on: modelValue === null }" @click="select(null)">{{ t('cat.none') }}</button>
 
+    <!-- parents in the user's order, each followed by its subcategories ("› Name") -->
     <button
-      v-for="c in store.categories"
+      v-for="c in store.ordered"
       :key="c.id"
       type="button"
       class="chip"
-      :class="{ on: modelValue === c.id }"
+      :class="{ on: modelValue === c.id, 'is-sub': !!store.parentOf(c.id) }"
+      :title="store.label(c.id)"
       @click="select(c.id)"
     >
-      <span class="dot" :style="{ background: c.color }"></span>{{ c.name }}
+      <span class="dot" :style="{ background: store.color(c.id) ?? c.color }"></span>
+      <span v-if="store.parentOf(c.id)" class="sub-mark" aria-hidden="true">›</span>{{ c.name }}
     </button>
 
     <template v-if="creating">
@@ -96,6 +99,8 @@ async function create() {
 .chip.new { color: var(--color-text-info); border-style: dashed; border-color: var(--color-border-secondary); }
 .chip.new i { font-size: 13px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; }
+.sub-mark { color: var(--color-text-tertiary); margin-right: -1px; }
+.chip.on .sub-mark { color: inherit; opacity: 0.7; }
 .new-input {
   border: 0.5px solid var(--color-text-info);
   border-radius: 14px; padding: 4px 10px; font-size: 12px;

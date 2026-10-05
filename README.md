@@ -173,6 +173,7 @@ create table categories (
   color               text not null default '#8E8E93',
   position            int not null default 0,
   exclude_from_streak boolean not null default false,
+  parent_id           uuid references categories (id) on delete cascade, -- one level of subcategories
   created_at          timestamptz not null default now()
 );
 
@@ -196,6 +197,7 @@ create table tasks (
 
 create index tasks_user_date_idx on tasks (user_id, task_date);
 create index tasks_series_idx on tasks (series_id) where series_id is not null;
+create index categories_parent_idx on categories (parent_id) where parent_id is not null;
 
 create table note_folders (
   id          uuid primary key default gen_random_uuid(),
@@ -339,6 +341,15 @@ alter table calendar_events add column if not exists category_id uuid references
 alter table calendar_events add column if not exists note text;
 alter table calendar_events add column if not exists series_id uuid;
 create index if not exists calendar_events_series_idx on calendar_events (series_id) where series_id is not null;
+```
+
+### Migration — subcategories
+
+One level of subcategories (e.g. Work › Client A). A subcategory inherits its parent's color and streak flag; deleting a parent deletes its subcategories (their tasks/events keep existing, without a category).
+
+```sql
+alter table categories add column if not exists parent_id uuid references categories (id) on delete cascade;
+create index if not exists categories_parent_idx on categories (parent_id) where parent_id is not null;
 ```
 
 </details>

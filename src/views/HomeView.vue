@@ -78,18 +78,7 @@
 
     <!-- category filter -->
     <section v-if="categoriesStore.categories.length" class="filters">
-      <div class="chips" ref="chipsEl" @wheel="onChipsWheel">
-        <button class="chip" :class="{ on: selectedCats.size === 0 }" @click="selectedCats = new Set()">{{ t('cat.all') }}</button>
-        <button
-          v-for="c in categoriesStore.categories"
-          :key="c.id"
-          class="chip"
-          :class="{ on: selectedCats.has(c.id) }"
-          @click="toggleCat(c.id)"
-        >
-          <span class="cat-dot" :style="{ background: c.color }"></span>{{ c.name }}
-        </button>
-      </div>
+      <CategoryFilter v-model="selectedCats" />
       <button class="manage" @click="catSheet = true" :aria-label="t('cat.manage')" :title="t('cat.manage')"><i class="ti ti-adjustments-horizontal"></i></button>
     </section>
 
@@ -115,23 +104,17 @@
             @deleted="keepDayOpen"
           />
           <button
-            v-else-if="day.isFuture"
+            v-else
             type="button"
             class="compact"
             @click="expandDay(day.date)"
           >
             <div class="day-title">
-              <span class="day-name">{{ fmt.dayName(day.date) }}</span>
+              <span class="day-name" :class="{ muted: !day.isFuture }">{{ fmt.dayName(day.date) }}</span>
               <span class="day-date">{{ day.label }}</span>
             </div>
             <span class="add-hint"><i class="ti ti-plus"></i>{{ t('home.add') }}</span>
           </button>
-          <div v-else class="compact past">
-            <div class="day-title">
-              <span class="day-name muted">{{ fmt.dayName(day.date) }}</span>
-              <span class="day-date">{{ day.label }}</span>
-            </div>
-          </div>
         </div>
       </template>
     </section>
@@ -147,6 +130,7 @@ import { useI18n } from 'vue-i18n'
 import DayList from '@/components/DayList.vue'
 import OverdueSection from '@/components/OverdueSection.vue'
 import CategoriesSheet from '@/components/CategoriesSheet.vue'
+import CategoryFilter from '@/components/CategoryFilter.vue'
 import ConnectCalendarSheet from '@/components/ConnectCalendarSheet.vue'
 import { useTasksStore } from '@/stores/tasks'
 import { useCategoriesStore } from '@/stores/categories'
@@ -167,11 +151,6 @@ const calendarsStore = useCalendarsStore()
 const monday = ref(getMonday(new Date()))
 const expanded = ref<Set<string>>(new Set())
 const selectedCats = ref<Set<string>>(new Set()) // empty = all categories
-function toggleCat(id: string) {
-  const s = new Set(selectedCats.value)
-  s.has(id) ? s.delete(id) : s.add(id)
-  selectedCats.value = s
-}
 const isThisWeek = computed(() => monday.value === getMonday(today()))
 const catSheet = ref(false)
 const calSheet = ref(false)
@@ -185,20 +164,14 @@ const weekTitle = computed(() => {
   return monday.value < cur ? t('home.lastWeek') : t('home.nextWeek')
 })
 
-// tasks for the current category filter (empty selection = all; otherwise OR)
+// tasks for the current category filter (empty selection = all; otherwise OR;
+// a parent also matches its subcategories)
 const filteredTasks = computed(() =>
-  selectedCats.value.size === 0
-    ? tasksStore.tasks
-    : tasksStore.tasks.filter(t => t.category_id !== null && selectedCats.value.has(t.category_id)))
+  tasksStore.tasks.filter(t => categoriesStore.matchesFilter(t.category_id, selectedCats.value)))
 
 // events, same category filter (manual events carry their own category, feed events the feed's)
 const filteredEvents = computed(() =>
-  selectedCats.value.size === 0
-    ? calendarsStore.events
-    : calendarsStore.events.filter(e => {
-      const c = calendarsStore.categoryOf(e)
-      return c !== null && selectedCats.value.has(c)
-    }))
+  calendarsStore.events.filter(e => categoriesStore.matchesFilter(calendarsStore.categoryOf(e), selectedCats.value)))
 
 const weekDays = computed(() => {
   const t = today()
@@ -233,7 +206,7 @@ function barHeight(total: number) { return Math.max(8, Math.round(total / maxTot
 // done ones solid at the bottom, the rest dimmed above, so the bar still reads
 // as "this much of the day is done". Segments flex evenly, so no rounding drift.
 const catRank = (id: string | null) => {
-  const i = id ? categoriesStore.categories.findIndex(c => c.id === id) : -1
+  const i = id ? categoriesStore.ordered.findIndex(c => c.id === id) : -1
   return i === -1 ? Number.MAX_SAFE_INTEGER : i
 }
 
@@ -277,15 +250,6 @@ function shiftWeek(dir: number) {
   load()
 }
 
-
-// desktop: vertical wheel scrolls the category filter row horizontally
-const chipsEl = ref<HTMLElement | null>(null)
-function onChipsWheel(e: WheelEvent) {
-  const el = chipsEl.value
-  if (!el || el.scrollWidth <= el.clientWidth || e.deltaY === 0) return
-  el.scrollLeft += e.deltaY
-  e.preventDefault()
-}
 
 // collapsing header: watch the scroll container
 const rootEl = ref<HTMLElement | null>(null)
@@ -389,17 +353,6 @@ onBeforeUnmount(() => {
 
 /* category filter */
 .filters { display: flex; align-items: center; gap: 8px; padding: 0 18px 12px; }
-.chips { display: flex; gap: 6px; overflow-x: auto; flex: 1; scrollbar-width: none; }
-.chips::-webkit-scrollbar { display: none; }
-.chip {
-  display: flex; align-items: center; gap: 5px; flex-shrink: 0;
-  border: 0.5px solid var(--color-border-secondary);
-  background: var(--color-background-primary);
-  color: var(--color-text-secondary);
-  border-radius: 14px; padding: 4px 11px; font-size: 12px; cursor: pointer;
-}
-.chip.on { background: var(--color-background-info); border-color: transparent; color: var(--color-text-info); }
-.cat-dot { width: 8px; height: 8px; border-radius: 50%; }
 .manage {
   flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
   border: 0.5px solid var(--color-border-tertiary); background: none;
@@ -423,7 +376,6 @@ onBeforeUnmount(() => {
   display: flex; align-items: center; justify-content: space-between;
   background: none; border: none; cursor: pointer;
 }
-.compact.past { cursor: default; }
 .day-title { display: flex; align-items: baseline; gap: 8px; }
 .day-name { font-size: 16px; font-weight: 500; color: var(--color-text-primary); }
 .day-name.muted { color: var(--color-text-secondary); }

@@ -25,92 +25,40 @@
         </div>
 
         <div v-else class="list">
+          <!-- top-level categories; each carries its own list of subcategories.
+               Separate groups + handles, so a row can only move within its group. -->
           <draggable
-            :model-value="store.categories"
+            :model-value="store.topLevel"
             item-key="id"
             handle=".cat-drag"
+            :group="{ name: 'cat-top', pull: false, put: false }"
             :animation="150"
-            @update:model-value="store.reorderCategories"
+            @update:model-value="store.reorderGroup"
           >
             <template #item="{ element: c }">
-              <div class="cat">
-            <div class="cat-main">
-              <div v-if="swipeId === c.id && swipeDx < 0" class="swipe-bg" :class="{ ready: swipeDx < -SWIPE_TH }">
-                <i class="ti ti-trash"></i>
-              </div>
-              <div
-                class="cat-fore"
-                :class="{ swiping: swipeId === c.id }"
-                :style="swipeStyle(c.id)"
-                @touchstart="onDown($event, c)"
-                @touchmove="onMove($event, c)"
-                @touchend="onUp($event, c)"
-              >
-                <span class="cat-drag" @touchstart.stop :aria-label="t('day.reorder')" :title="t('day.reorder')"><i class="ti ti-grip-vertical"></i></span>
-                <button
-                  class="swatch"
-                  :style="{ background: c.color }"
-                  @click="editing = editing === c.id ? null : c.id"
-                  :aria-expanded="editing === c.id"
-                  :aria-label="t('cat.settingsAria')"
-                  :title="t('cat.settingsAria')"
-                ></button>
-                <input
-                  class="cat-name"
-                  :value="c.name"
-                  @change="rename(c, ($event.target as HTMLInputElement).value)"
+              <div class="cat-group">
+                <CategoryRow :cat="c" :open="editing === c.id" @toggle="toggleEdit(c.id)" @delete="deleteCat(c)" />
+                <draggable
+                  :model-value="store.childrenOf(c.id)"
+                  item-key="id"
+                  handle=".sub-drag"
+                  :group="{ name: 'cat-sub-' + c.id, pull: false, put: false }"
+                  :animation="150"
+                  @update:model-value="store.reorderGroup"
                 >
-                <i
-                  v-if="c.exclude_from_streak"
-                  class="ti ti-flame-off no-streak"
-                  :aria-label="t('cat.notInStreak')"
-                  :title="t('cat.notInStreak')"
-                ></i>
-                <button class="trash" @click="deleteCat(c)" :aria-label="t('cat.deleteAria')" :title="t('cat.deleteAria')">
-                  <i class="ti ti-trash"></i>
-                </button>
-              </div>
-            </div>
-            <div v-if="editing === c.id" class="cat-panel">
-              <div class="palette">
-                <button
-                  v-for="col in PALETTE"
-                  :key="col"
-                  class="chip"
-                  :class="{ on: col === c.color }"
-                  :style="{ background: col }"
-                  @click="store.updateCategory(c.id, { color: col })"
-                ></button>
-                <label class="chip custom" :class="{ on: !PALETTE.includes(c.color) }" :aria-label="t('cat.customColorAria')" :title="t('cat.customColorAria')">
-                  <input
-                    type="color"
-                    :value="c.color"
-                    @change="store.updateCategory(c.id, { color: ($event.target as HTMLInputElement).value })"
-                  >
-                  <i class="ti ti-color-picker"></i>
-                </label>
-              </div>
-              <div class="prop-row">
-                <i class="ti" :class="c.exclude_from_streak ? 'ti-flame-off' : 'ti-flame'"></i>
-                <span class="prop-label">{{ t('cat.countStreak') }}</span>
-                <button
-                  class="ac-switch"
-                  :class="{ on: !c.exclude_from_streak }"
-                  role="switch"
-                  :aria-checked="!c.exclude_from_streak"
-                  :aria-label="t('cat.countStreak')"
-                  @click="store.updateCategory(c.id, { exclude_from_streak: !c.exclude_from_streak })"
-                ></button>
-              </div>
-              <p class="prop-hint">{{ t('cat.countStreakHint') }}</p>
-            </div>
+                  <template #item="{ element: sc }">
+                    <div class="cat-sub-item">
+                      <CategoryRow :cat="sc" :open="editing === sc.id" @toggle="toggleEdit(sc.id)" @delete="deleteCat(sc)" />
+                    </div>
+                  </template>
+                </draggable>
               </div>
             </template>
           </draggable>
 
           <div v-for="tomb in tombstones" :key="'tomb-' + tomb.cat.id" class="cat-tomb">
             <span class="tomb-icon"><i class="ti ti-trash"></i></span>
-            <span class="tomb-text">{{ tomb.cat.name }}</span>
+            <span class="tomb-text">{{ tomb.cat.name }}<template v-if="tomb.tomb.cats.length > 1"> + {{ tomb.tomb.cats.length - 1 }}</template></span>
             <button class="tomb-undo" @click="undoTomb(tomb)">
               <i class="ti ti-arrow-back-up"></i> {{ t('undo.action') }}
             </button>
@@ -122,7 +70,7 @@
         <!-- new category -->
         <div v-if="tab === 'manage'" class="new">
           <div class="new-row">
-            <button class="swatch" :style="{ background: newColor }" @click="cyclePalette"></button>
+            <button class="swatch" :style="{ background: newParent ? store.color(newParent) ?? newColor : newColor }" :disabled="!!newParent" @click="cyclePalette"></button>
             <input
               v-model="newName"
               class="cat-name"
@@ -131,7 +79,16 @@
             >
             <button class="add-btn" :disabled="!newName.trim()" @click="add">{{ t('cat.add') }}</button>
           </div>
-          <div class="palette">
+          <div class="new-parent">
+            <i class="ti ti-subtask"></i>
+            <label class="new-parent-label" for="cat-new-parent">{{ t('cat.parent') }}</label>
+            <select id="cat-new-parent" v-model="newParent" class="parent-select">
+              <option :value="null">{{ t('cat.parentNone') }}</option>
+              <option v-for="p in store.topLevel" :key="p.id" :value="p.id">{{ p.name }}</option>
+            </select>
+          </div>
+          <p v-if="newParent" class="new-hint">{{ t('cat.inherits') }}</p>
+          <div v-else class="palette">
             <button
               v-for="col in PALETTE"
               :key="col"
@@ -149,13 +106,34 @@
       </div>
     </div>
   </transition>
+
+  <!-- deleting a category that has subcategories deletes them too: confirm first -->
+  <ConfirmDialog
+    :open="!!pendingDelete"
+    danger
+    :title="t('cat.deleteParentTitle', { name: pendingDelete?.name ?? '' })"
+    :confirm-label="t('common.delete')"
+    :cancel-label="t('common.cancel')"
+    @confirm="confirmDelete"
+    @cancel="pendingDelete = null"
+  >
+    <p class="cd-text">{{ t('cat.deleteParentBody') }}</p>
+    <ul class="cd-subs">
+      <li v-for="sc in pendingChildren" :key="sc.id">
+        <span class="cd-dot" :style="{ background: store.color(sc.id) ?? sc.color }"></span><span class="cd-sub-name">{{ sc.name }}</span>
+      </li>
+    </ul>
+    <p class="cd-note">{{ t('cat.deleteParentNote') }}</p>
+  </ConfirmDialog>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import draggable from 'vuedraggable'
-import { useCategoriesStore, type Affected } from '@/stores/categories'
+import CategoryRow from '@/components/CategoryRow.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { useCategoriesStore, type CategoryTomb } from '@/stores/categories'
 import { useTasksStore } from '@/stores/tasks'
 import { PALETTE } from '@/lib/colors'
 import type { Category } from '@/types'
@@ -170,18 +148,23 @@ const tasksStore = useTasksStore()
 const editing = ref<string | null>(null)
 const newName = ref('')
 const newColor = ref(PALETTE[5])
+const newParent = ref<string | null>(null) // create as a subcategory of this one
+// the chosen parent was deleted (or became a subcategory itself) → back to none
+watch(() => store.topLevel, top => {
+  if (newParent.value && !top.some(c => c.id === newParent.value)) newParent.value = null
+})
 const tab = ref<'manage' | 'time'>('manage')
 
 // hours tracked per category for the currently viewed week (done / planned), categories without any timed task hidden
 const catTime = computed(() => {
-  const rows = store.categories.map(c => {
+  const rows = store.ordered.map(c => {
     let doneMin = 0, totalMin = 0
     for (const task of tasksStore.tasks) {
       if (task.category_id !== c.id || task.duration_min == null) continue
       totalMin += task.duration_min
       if (task.status === 'done') doneMin += task.duration_min
     }
-    return { id: c.id, name: c.name, color: c.color, doneMin, totalMin }
+    return { id: c.id, name: store.label(c.id), color: store.color(c.id) ?? c.color, doneMin, totalMin }
   })
   return rows.filter(r => r.totalMin > 0).sort((a, b) => b.totalMin - a.totalMin)
 })
@@ -192,15 +175,46 @@ function fmtHours(min: number) {
 
 function close() { emit('update:modelValue', false) }
 
-// delete (via trash tap or swipe-left) leaves an inline "undo" row for ~5s
-type Tomb = { cat: Category; affected: Affected }
+function toggleEdit(id: string) {
+  editing.value = editing.value === id ? null : id
+}
+
+// delete (via trash tap or swipe-left) leaves an inline "undo" row for ~5s; a
+// category with subcategories takes them along, so it asks first
+type Tomb = { cat: Category; tomb: CategoryTomb }
 const tombstones = ref<Tomb[]>([])
 const tombTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const pendingDelete = ref<Category | null>(null)
+const pendingChildren = computed(() => (pendingDelete.value ? store.childrenOf(pendingDelete.value.id) : []))
 
-async function deleteCat(c: Category) {
+function deleteCat(c: Category) {
+  if (deleting.has(c.id)) return
+  if (store.childrenOf(c.id).length) pendingDelete.value = c
+  else doDelete(c)
+}
+
+function confirmDelete() {
+  const c = pendingDelete.value
+  pendingDelete.value = null
+  if (c) doDelete(c)
+}
+
+// a delete looks up the category's links first, so guard against a second tap meanwhile
+const deleting = new Set<string>()
+async function doDelete(c: Category) {
+  if (deleting.has(c.id)) return
+  deleting.add(c.id)
   editing.value = null
-  const affected = await store.deleteCategory(c.id)
-  tombstones.value.push({ cat: { ...c }, affected })
+  let tomb: CategoryTomb
+  try {
+    tomb = await store.deleteCategory(c.id)
+  } catch (e) {
+    console.error('delete category failed', e)
+    return
+  } finally {
+    deleting.delete(c.id)
+  }
+  tombstones.value.push({ cat: { ...c }, tomb })
   tombTimers.set(c.id, setTimeout(() => {
     tombstones.value = tombstones.value.filter(x => x.cat.id !== c.id)
     tombTimers.delete(c.id)
@@ -211,47 +225,7 @@ async function undoTomb(tomb: Tomb) {
   const tmr = tombTimers.get(tomb.cat.id)
   if (tmr) { clearTimeout(tmr); tombTimers.delete(tomb.cat.id) }
   tombstones.value = tombstones.value.filter(x => x.cat.id !== tomb.cat.id)
-  await store.restoreCategory(tomb.cat, tomb.affected)
-}
-
-// swipe-left a category row to delete (touch)
-const SWIPE_TH = 70
-const swipeId = ref<string | null>(null)
-const swipeDx = ref(0)
-let sx = 0, sy = 0, swiping = false, horizontal = false
-
-function swipeStyle(id: string) {
-  if (swipeId.value !== id) return undefined
-  return { transform: `translateX(${swipeDx.value}px)`, transition: 'none' }
-}
-function onDown(e: TouchEvent, c: Category) {
-  sx = e.touches[0].clientX; sy = e.touches[0].clientY
-  swiping = true; horizontal = false
-  swipeId.value = c.id; swipeDx.value = 0
-}
-function onMove(e: TouchEvent, _c: Category) {
-  if (!swiping) return
-  const dx = e.touches[0].clientX - sx
-  const dy = e.touches[0].clientY - sy
-  if (!horizontal) {
-    if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) horizontal = true
-    else if (Math.abs(dy) > 10) { swiping = false; swipeId.value = null; return }
-    else return
-  }
-  if (dx > 0) { swipeDx.value = 0; return } // delete is left-only
-  e.preventDefault()
-  swipeDx.value = dx
-}
-function onUp(_e: TouchEvent, c: Category) {
-  const dx = swipeDx.value
-  swiping = false; horizontal = false
-  swipeId.value = null; swipeDx.value = 0
-  if (dx < -SWIPE_TH) deleteCat(c)
-}
-
-function rename(c: Category, name: string) {
-  const v = name.trim()
-  if (v && v !== c.name) store.updateCategory(c.id, { name: v })
+  await store.restoreCategory(tomb.tomb)
 }
 
 function cyclePalette() {
@@ -262,7 +236,7 @@ function cyclePalette() {
 async function add() {
   const name = newName.value.trim()
   if (!name) return
-  await store.addCategory(name, newColor.value)
+  await store.addCategory(name, newColor.value, newParent.value)
   newName.value = ''
 }
 </script>
@@ -298,15 +272,15 @@ async function add() {
 
 .list { padding: 0 18px; }
 .cat { padding: 8px 0; border-top: 0.5px solid var(--color-border-tertiary); }
-.cat-main { position: relative; overflow: hidden; }
 .cat-fore { display: flex; align-items: center; gap: 12px; background: var(--color-background-primary); }
-.cat-fore.swiping { transition: transform .2s; }
-.swipe-bg {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end;
-  padding: 0 16px; background: var(--color-text-danger); color: #fff; font-size: 18px;
-  filter: saturate(0.85) brightness(0.85);
+.swatch { width: 26px; height: 26px; border-radius: 50%; border: 0.5px solid var(--color-border-tertiary); flex-shrink: 0; cursor: pointer; padding: 0; }
+.swatch:disabled { cursor: default; }
+.cat-name {
+  flex: 1; min-width: 0; border: none; background: none; color: var(--color-text-primary);
+  font-size: 15px; padding: 6px 0;
 }
-.swipe-bg.ready { filter: none; }
+.cat-name:focus { outline: none; }
+.empty { color: var(--color-text-tertiary); font-size: 14px; padding: 12px 0; }
 
 .cat-tomb {
   display: flex; align-items: center; gap: 12px;
@@ -323,39 +297,8 @@ async function add() {
 }
 .tomb-undo i { font-size: 15px; }
 @keyframes tomb-in { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
-.swatch { width: 26px; height: 26px; border-radius: 50%; border: 0.5px solid var(--color-border-tertiary); flex-shrink: 0; cursor: pointer; padding: 0; }
-.cat-name {
-  flex: 1; border: none; background: none; color: var(--color-text-primary);
-  font-size: 15px; padding: 6px 0;
-}
-.cat-name:focus { outline: none; }
-.trash { border: none; background: none; color: var(--color-text-tertiary); cursor: pointer; font-size: 18px; padding: 4px; }
-.cat-drag {
-  display: flex; align-items: center; flex-shrink: 0;
-  color: var(--color-text-tertiary); font-size: 18px;
-  cursor: grab; padding: 0 2px; touch-action: none;
-}
-.cat-drag:active { cursor: grabbing; }
-.empty { color: var(--color-text-tertiary); font-size: 14px; padding: 12px 0; }
 
 .palette { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0 4px; }
-.cat-panel { padding-bottom: 4px; }
-.no-streak { color: var(--color-text-tertiary); font-size: 15px; flex-shrink: 0; }
-.prop-row { display: flex; align-items: center; gap: 10px; padding: 10px 0 2px; }
-.prop-row > i { color: var(--color-text-tertiary); font-size: 18px; }
-.prop-label { flex: 1; font-size: 15px; }
-.prop-hint { color: var(--color-text-tertiary); font-size: 12px; margin: 0; }
-.ac-switch {
-  position: relative; flex-shrink: 0; width: 44px; height: 26px; padding: 0;
-  border: none; border-radius: 13px; cursor: pointer;
-  background: var(--color-background-tertiary); transition: background .2s ease;
-}
-.ac-switch::after {
-  content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%;
-  background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .2s ease;
-}
-.ac-switch.on { background: var(--color-text-success); }
-.ac-switch.on::after { transform: translateX(18px); }
 .chip { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
 .chip.on { border-color: var(--color-text-primary); }
 .chip.custom {
@@ -365,6 +308,34 @@ async function add() {
 }
 .chip.custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; padding: 0; border: none; }
 .chip.custom i { font-size: 14px; pointer-events: none; }
+
+.new-parent { display: flex; align-items: center; gap: 10px; padding: 10px 0 0; }
+.new-parent > i { color: var(--color-text-tertiary); font-size: 18px; }
+.new-parent-label { flex: 1; font-size: 14px; color: var(--color-text-secondary); }
+.parent-select {
+  max-width: 55%; min-width: 0;
+  border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md);
+  background: var(--color-background-primary); color: var(--color-text-primary);
+  font-family: inherit; font-size: 14px; padding: 5px 8px; cursor: pointer;
+}
+.parent-select:focus-visible { outline: 2px solid var(--color-text-info); outline-offset: 1px; }
+.new-hint { color: var(--color-text-tertiary); font-size: 12px; margin: 6px 0 0; }
+
+/* confirmation dialog body (slot content — compiled with this component's scope) */
+.cd-text { margin: 0 0 8px; }
+.cd-subs {
+  list-style: none; margin: 0 0 8px; padding: 0;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 6px;
+}
+.cd-subs li {
+  display: flex; align-items: center; gap: 6px; max-width: 100%;
+  padding: 4px 10px; border-radius: 999px;
+  background: var(--color-background-secondary); color: var(--color-text-primary);
+  font-size: 13px;
+}
+.cd-sub-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.cd-note { margin: 0; font-size: 12px; color: var(--color-text-tertiary); }
 
 .new { padding: 12px 18px 4px; border-top: 0.5px solid var(--color-border-tertiary); margin-top: 6px; }
 .new-row { display: flex; align-items: center; gap: 12px; }

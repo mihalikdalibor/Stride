@@ -125,7 +125,7 @@ To avoid the today/missed red clash: **today** = red filled circle around the nu
 - Period segmented control: Týždeň / Mesiac / Rok.
 - Metric cards (2×2): "Hotové · <obdobie>", "Completion %", "Aktuálny streak" (flame icon), "Najdlhší streak".
 - **Streak** lives in `src/lib/streak.ts` (not in the view): a day counts when everything judged on it is done, an unfinished past day breaks it, a day with nothing to judge is skipped. Events **never** count and neither do tasks from a category with `exclude_from_streak` — such a day stays "empty", so it neither extends nor breaks the streak.
-- Bar chart that buckets by the selected period (week→days, month→last 6 weeks, year→12 months); current/partial bucket label highlighted red. Build with Chart.js / vue-chartjs. A small `Count ↔ %` toggle in the chart header switches the bars between done **count** and **completion %** (`done/total`, y-axis 0–100) over the same buckets. Value labels are drawn above each non-zero bar via a tiny inline plugin (`valueLabels`).
+- Bar chart that buckets by the selected period (week→days, month→Monday-start weeks of the current calendar month, first/last clipped, year→12 months); current/partial bucket label highlighted red. Build with Chart.js / vue-chartjs. A small `Count ↔ %` toggle in the chart header switches the bars between done **count** and **completion %** (`done/total`, y-axis 0–100) over the same buckets. Value labels are drawn above each non-zero bar via a tiny inline plugin (`valueLabels`).
 - Small insight line ("Najsilnejší deň v týždni: …").
 - "Podľa kategórie" breakdown (horizontal bars). Currently placeholder data; activates when categories are turned on. Per-category colors are TBD — bars are neutral blue for now.
 

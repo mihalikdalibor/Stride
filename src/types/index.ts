@@ -7,6 +7,8 @@ export interface Category {
   color: string
   position?: number
   exclude_from_streak: boolean   // its tasks don't count toward the streak
+  // one level of subcategories: a child inherits the parent's color + streak flag
+  parent_id?: string | null
   created_at?: string
 }
 

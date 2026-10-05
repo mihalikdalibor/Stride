@@ -18,8 +18,10 @@ export async function exportBackup() {
     app: 'stride',
     version: 1,
     exportedAt: new Date().toISOString(),
-    categories: catStore.categories.map(c => ({
+    // parents before their subcategories (import relies on it)
+    categories: catStore.ordered.map(c => ({
       id: c.id, name: c.name, color: c.color, exclude_from_streak: c.exclude_from_streak,
+      position: c.position ?? 0, parent_id: c.parent_id ?? null,
     })),
     tasks: tasks.map(({ id: _id, ...t }) => t),
     events: events.map(({ id: _id, ...e }) => e),
@@ -42,13 +44,16 @@ export async function importBackup(file: File): Promise<ImportResult> {
   const catStore = useCategoriesStore()
   const calendarsStore = useCalendarsStore()
 
-  // insert categories, mapping old id -> new id
+  // insert categories, mapping old id -> new id: top-level ones first, then
+  // subcategories under their new parent (older backups have no parent_id)
   const idMap = new Map<string, string>()
-  const cats: any[] = Array.isArray(data.categories) ? data.categories : []
-  for (const c of cats) {
-    if (!c?.name) continue
-    const created = await catStore.addCategory(c.name, c.color || '#8E8E93')
-    if (c.exclude_from_streak) await catStore.updateCategory(created.id, { exclude_from_streak: true })
+  const cats: any[] = (Array.isArray(data.categories) ? data.categories : []).filter((c: any) => c?.name)
+  const ids = new Set(cats.map(c => c.id))
+  const isSub = (c: any) => !!c.parent_id && ids.has(c.parent_id)
+  for (const c of [...cats.filter(c => !isSub(c)), ...cats.filter(isSub)]) {
+    const parent = isSub(c) ? idMap.get(c.parent_id) ?? null : null
+    const created = await catStore.addCategory(c.name, c.color || '#8E8E93', parent)
+    if (!parent && c.exclude_from_streak) await catStore.updateCategory(created.id, { exclude_from_streak: true })
     if (c.id) idMap.set(c.id, created.id)
   }
 
